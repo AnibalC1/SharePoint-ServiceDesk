@@ -1,0 +1,314 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/pnp/provisioning-schema-2022-09",
+  "listName": "Categories",
+  "listDescription": "Service Desk ticket categories with SLA targets and default assignments per department.",
+  "baseTemplate": "GenericList",
+  "contentTypesEnabled": true,
+  "enableVersioning": true,
+  "majorVersionLimit": 20,
+  "hidden": false,
+  "onQuickLaunch": true,
+  "fields": [
+    {
+      "InternalName": "Title",
+      "DisplayName": "Category Name",
+      "Type": "Text",
+      "Required": true,
+      "MaxLength": 255,
+      "Indexed": true,
+      "Description": "Name of the support category (e.g., Password Reset, Onboarding)."
+    },
+    {
+      "InternalName": "Department",
+      "DisplayName": "Department",
+      "Type": "Choice",
+      "Required": true,
+      "Format": "Dropdown",
+      "FillInChoice": false,
+      "Description": "Department this category belongs to.",
+      "Choices": [
+        "IT",
+        "HR",
+        "Operations",
+        "Finance",
+        "Facilities"
+      ],
+      "SchemaXml": "<Field Type=\"Choice\" DisplayName=\"Department\" Required=\"TRUE\" Format=\"Dropdown\" FillInChoice=\"FALSE\" ID=\"{1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d}\" StaticName=\"Department\" Name=\"Department\" Description=\"Department this category belongs to.\"><Default></Default><CHOICES><CHOICE>IT</CHOICE><CHOICE>HR</CHOICE><CHOICE>Operations</CHOICE><CHOICE>Finance</CHOICE><CHOICE>Facilities</CHOICE></CHOICES></Field>"
+    },
+    {
+      "InternalName": "CategoryDescription",
+      "DisplayName": "Description",
+      "Type": "Note",
+      "Required": false,
+      "RichText": false,
+      "NumberOfLines": 4,
+      "Description": "Detailed description of what this category covers.",
+      "SchemaXml": "<Field Type=\"Note\" DisplayName=\"Description\" Required=\"FALSE\" RichText=\"FALSE\" NumLines=\"4\" ID=\"{2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e}\" StaticName=\"CategoryDescription\" Name=\"CategoryDescription\" Description=\"Detailed description of what this category covers.\" />"
+    },
+    {
+      "InternalName": "IsActive",
+      "DisplayName": "Is Active",
+      "Type": "Boolean",
+      "Required": false,
+      "Default": true,
+      "Description": "Whether this category is currently available for new tickets.",
+      "SchemaXml": "<Field Type=\"Boolean\" DisplayName=\"Is Active\" Required=\"FALSE\" ID=\"{3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f}\" StaticName=\"IsActive\" Name=\"IsActive\" Description=\"Whether this category is currently available for new tickets.\"><Default>1</Default></Field>"
+    },
+    {
+      "InternalName": "DefaultPriority",
+      "DisplayName": "Default Priority",
+      "Type": "Choice",
+      "Required": false,
+      "Format": "Dropdown",
+      "FillInChoice": false,
+      "Default": "Medium",
+      "Description": "Default priority assigned to tickets created under this category.",
+      "Choices": [
+        "Low",
+        "Medium",
+        "High",
+        "Critical"
+      ],
+      "SchemaXml": "<Field Type=\"Choice\" DisplayName=\"Default Priority\" Required=\"FALSE\" Format=\"Dropdown\" FillInChoice=\"FALSE\" ID=\"{4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a}\" StaticName=\"DefaultPriority\" Name=\"DefaultPriority\" Description=\"Default priority assigned to tickets created under this category.\"><Default>Medium</Default><CHOICES><CHOICE>Low</CHOICE><CHOICE>Medium</CHOICE><CHOICE>High</CHOICE><CHOICE>Critical</CHOICE></CHOICES></Field>"
+    },
+    {
+      "InternalName": "SLAHours",
+      "DisplayName": "SLA Hours",
+      "Type": "Number",
+      "Required": false,
+      "Min": 1,
+      "Max": 720,
+      "Decimals": 0,
+      "Description": "Target resolution time in hours for this category.",
+      "SchemaXml": "<Field Type=\"Number\" DisplayName=\"SLA Hours\" Required=\"FALSE\" Min=\"1\" Max=\"720\" Decimals=\"0\" ID=\"{5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b}\" StaticName=\"SLAHours\" Name=\"SLAHours\" Description=\"Target resolution time in hours for this category.\" />"
+    },
+    {
+      "InternalName": "DefaultAssignee",
+      "DisplayName": "Default Assignee",
+      "Type": "User",
+      "Required": false,
+      "UserSelectionMode": "PeopleOnly",
+      "UserSelectionScope": 0,
+      "Description": "Default agent or group assigned to tickets in this category.",
+      "SchemaXml": "<Field Type=\"User\" DisplayName=\"Default Assignee\" Required=\"FALSE\" UserSelectionMode=\"PeopleOnly\" UserSelectionScope=\"0\" ID=\"{6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c}\" StaticName=\"DefaultAssignee\" Name=\"DefaultAssignee\" Description=\"Default agent or group assigned to tickets in this category.\" />"
+    }
+  ],
+  "views": [
+    {
+      "viewName": "All Categories",
+      "isDefault": true,
+      "rowLimit": 50,
+      "paged": true,
+      "query": "<OrderBy><FieldRef Name=\"Department\" Ascending=\"TRUE\" /><FieldRef Name=\"Title\" Ascending=\"TRUE\" /></OrderBy>",
+      "viewFields": [
+        "Title",
+        "Department",
+        "CategoryDescription",
+        "IsActive",
+        "DefaultPriority",
+        "SLAHours",
+        "DefaultAssignee"
+      ]
+    },
+    {
+      "viewName": "Active Categories",
+      "isDefault": false,
+      "rowLimit": 50,
+      "paged": true,
+      "query": "<Where><Eq><FieldRef Name=\"IsActive\" /><Value Type=\"Boolean\">1</Value></Eq></Where><OrderBy><FieldRef Name=\"Department\" Ascending=\"TRUE\" /><FieldRef Name=\"Title\" Ascending=\"TRUE\" /></OrderBy>",
+      "viewFields": [
+        "Title",
+        "Department",
+        "DefaultPriority",
+        "SLAHours",
+        "DefaultAssignee"
+      ]
+    }
+  ],
+  "contentTypes": [
+    {
+      "id": "0x0100B2C3D4E5F6A7B8C9D0E1F2A3B4C5",
+      "name": "Service Desk Category",
+      "description": "Content type for service desk ticket categories.",
+      "group": "Service Desk Content Types"
+    }
+  ],
+  "sampleData": [
+    {
+      "Title": "Password Reset",
+      "Department": "IT",
+      "CategoryDescription": "Requests to reset or unlock user account passwords across all systems including Active Directory, email, and line-of-business applications.",
+      "IsActive": true,
+      "DefaultPriority": "High",
+      "SLAHours": 4
+    },
+    {
+      "Title": "Software Installation",
+      "Department": "IT",
+      "CategoryDescription": "Requests to install, update, or remove software applications on company devices.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 24
+    },
+    {
+      "Title": "Network Issue",
+      "Department": "IT",
+      "CategoryDescription": "Reports of network connectivity problems including Wi-Fi, VPN, LAN, and internet access issues.",
+      "IsActive": true,
+      "DefaultPriority": "High",
+      "SLAHours": 8
+    },
+    {
+      "Title": "Hardware Request",
+      "Department": "IT",
+      "CategoryDescription": "Requests for new hardware, replacements, or repairs including laptops, monitors, peripherals, and mobile devices.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 48
+    },
+    {
+      "Title": "Email & Calendar Issue",
+      "Department": "IT",
+      "CategoryDescription": "Problems with email delivery, calendar sharing, mailbox access, distribution lists, and Outlook configuration.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 8
+    },
+    {
+      "Title": "Security Incident",
+      "Department": "IT",
+      "CategoryDescription": "Reports of suspected security breaches, phishing attempts, malware, unauthorized access, or data loss incidents.",
+      "IsActive": true,
+      "DefaultPriority": "Critical",
+      "SLAHours": 2
+    },
+    {
+      "Title": "Onboarding",
+      "Department": "HR",
+      "CategoryDescription": "New employee onboarding tasks including account creation, equipment provisioning, orientation scheduling, and benefits enrollment.",
+      "IsActive": true,
+      "DefaultPriority": "High",
+      "SLAHours": 24
+    },
+    {
+      "Title": "Offboarding",
+      "Department": "HR",
+      "CategoryDescription": "Employee departure tasks including account deactivation, equipment collection, exit interview scheduling, and final pay processing.",
+      "IsActive": true,
+      "DefaultPriority": "High",
+      "SLAHours": 24
+    },
+    {
+      "Title": "Benefits Inquiry",
+      "Department": "HR",
+      "CategoryDescription": "Questions and requests related to health insurance, retirement plans, PTO balances, and other employee benefits.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 48
+    },
+    {
+      "Title": "Payroll Issue",
+      "Department": "HR",
+      "CategoryDescription": "Reports of payroll discrepancies, direct deposit changes, tax withholding updates, and pay statement inquiries.",
+      "IsActive": true,
+      "DefaultPriority": "High",
+      "SLAHours": 24
+    },
+    {
+      "Title": "Training Request",
+      "Department": "HR",
+      "CategoryDescription": "Requests for employee training, certification programs, professional development courses, and conference attendance.",
+      "IsActive": true,
+      "DefaultPriority": "Low",
+      "SLAHours": 72
+    },
+    {
+      "Title": "Inventory Management",
+      "Department": "Operations",
+      "CategoryDescription": "Requests related to inventory tracking, stock replenishment, inventory discrepancies, and warehouse operations.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 24
+    },
+    {
+      "Title": "Shipping & Logistics",
+      "Department": "Operations",
+      "CategoryDescription": "Issues with shipment tracking, delivery scheduling, freight coordination, and logistics vendor management.",
+      "IsActive": true,
+      "DefaultPriority": "High",
+      "SLAHours": 8
+    },
+    {
+      "Title": "Process Improvement",
+      "Department": "Operations",
+      "CategoryDescription": "Suggestions and requests for operational process changes, workflow optimization, and efficiency improvements.",
+      "IsActive": true,
+      "DefaultPriority": "Low",
+      "SLAHours": 120
+    },
+    {
+      "Title": "Vendor Management",
+      "Department": "Operations",
+      "CategoryDescription": "Requests related to vendor onboarding, contract management, performance issues, and vendor communications.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 48
+    },
+    {
+      "Title": "Quality Control Issue",
+      "Department": "Operations",
+      "CategoryDescription": "Reports of quality defects, non-conformances, inspection failures, and corrective action requests.",
+      "IsActive": true,
+      "DefaultPriority": "High",
+      "SLAHours": 8
+    },
+    {
+      "Title": "Expense Report",
+      "Department": "Finance",
+      "CategoryDescription": "Requests related to expense report submission, approval status, reimbursement processing, and policy questions.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 48
+    },
+    {
+      "Title": "Purchase Order Request",
+      "Department": "Finance",
+      "CategoryDescription": "Requests to create, modify, or approve purchase orders for goods and services.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 24
+    },
+    {
+      "Title": "Budget Inquiry",
+      "Department": "Finance",
+      "CategoryDescription": "Questions about departmental budgets, cost center allocations, and budget transfer requests.",
+      "IsActive": true,
+      "DefaultPriority": "Low",
+      "SLAHours": 72
+    },
+    {
+      "Title": "Building Maintenance",
+      "Department": "Facilities",
+      "CategoryDescription": "Requests for building repairs, HVAC issues, plumbing, electrical work, and general facility maintenance.",
+      "IsActive": true,
+      "DefaultPriority": "Medium",
+      "SLAHours": 24
+    },
+    {
+      "Title": "Room Booking Issue",
+      "Department": "Facilities",
+      "CategoryDescription": "Problems with conference room reservations, AV equipment setup, room access, and meeting space availability.",
+      "IsActive": true,
+      "DefaultPriority": "Low",
+      "SLAHours": 8
+    },
+    {
+      "Title": "Office Supplies",
+      "Department": "Facilities",
+      "CategoryDescription": "Requests for office supplies, kitchen stock replenishment, and common area consumables.",
+      "IsActive": true,
+      "DefaultPriority": "Low",
+      "SLAHours": 48
+    }
+  ]
+}

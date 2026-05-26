@@ -1,0 +1,1257 @@
+# ==============================================================================
+# Service Desk - Ticket Detail Screen
+# Power Apps Canvas App (YAML Code-First Format)
+# ==============================================================================
+# Displays full ticket details, timeline/activity feed, agent edit form,
+# attachments, and escalation/close actions.
+# Data sources:
+#   - ServiceDeskTickets (main ticket data)
+#   - ServiceDeskComments (activity/timeline entries)
+# Navigation context: varSelectedTicketID (set before navigating here)
+# ==============================================================================
+
+Screen:
+  Name: scrTicketDetail
+  Fill: =RGBA(250, 249, 248, 1)  # Background
+
+  OnVisible: |
+    =// Load the selected ticket
+    Set(varLoadingDetail, true);
+    Set(varShowEscalateDialog, false);
+    Set(varShowCloseDialog, false);
+
+    Set(
+        varCurrentTicket,
+        LookUp(ServiceDeskTickets, ID = varSelectedTicketID)
+    );
+
+    // Load comments/activity for this ticket
+    ClearCollect(
+        colTicketComments,
+        Sort(
+            Filter(
+                ServiceDeskComments,
+                TicketID = varSelectedTicketID
+            ),
+            Created,
+            SortOrder.Descending
+        )
+    );
+
+    // Determine if current user is an agent/admin
+    Set(
+        varIsAgent,
+        User().Email in colAgentEmails.Email
+        || LookUp(
+            ServiceDeskAgents,
+            Email = User().Email
+        ).IsAgent
+    );
+
+    // Determine if current user is the ticket requester
+    Set(
+        varIsRequester,
+        Lower(varCurrentTicket.CreatedBy.Email) = Lower(User().Email)
+    );
+
+    Set(varLoadingDetail, false);
+
+  Children:
+
+    # ==========================================================================
+    # TOP BAR
+    # ==========================================================================
+    - Container:
+        Name: conDetailTopBar
+        LayoutDirection: Horizontal
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: 56
+        Fill: =RGBA(0, 120, 212, 1)
+        PaddingLeft: 12
+        PaddingRight: 20
+
+        Children:
+          - Button:
+              Name: btnDetailBack
+              Text: ""
+              Icon: =Icon.BackArrow
+              X: 8
+              Y: 8
+              Width: 40
+              Height: 40
+              Fill: =RGBA(0, 0, 0, 0)
+              Color: =RGBA(255, 255, 255, 1)
+              HoverFill: =RGBA(255, 255, 255, 0.15)
+              BorderStyle: =BorderStyle.None
+              OnSelect: =Back()
+
+          - Label:
+              Name: lblDetailTopTitle
+              Text: ="Ticket Details"
+              X: 56
+              Y: 0
+              Width: 200
+              Height: =Parent.Height
+              Font: =Font.'Segoe UI'
+              Size: 20
+              FontWeight: =FontWeight.Bold
+              Color: =RGBA(255, 255, 255, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+    # ==========================================================================
+    # TICKET HEADER SECTION
+    # ==========================================================================
+    - Container:
+        Name: conTicketHeader
+        X: 20
+        Y: 72
+        Width: =Parent.Width - 40
+        Height: 100
+        Fill: =RGBA(255, 255, 255, 1)
+        RadiusTopLeft: 8
+        RadiusTopRight: 8
+        RadiusBottomLeft: 8
+        RadiusBottomRight: 8
+        DropShadow: =DropShadow.Light
+        PaddingLeft: 24
+        PaddingRight: 24
+        PaddingTop: 16
+        PaddingBottom: 16
+
+        Children:
+          # Ticket ID — monospace
+          - Label:
+              Name: lblDetailTicketID
+              Text: =varCurrentTicket.TicketID
+              X: 0
+              Y: 8
+              Width: 160
+              Height: 28
+              Font: =Font.'Courier New'
+              Size: 16
+              FontWeight: =FontWeight.Bold
+              Color: =RGBA(50, 49, 48, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+          # Status Pill
+          - Button:
+              Name: btnDetailStatusPill
+              Text: =varCurrentTicket.Status
+              X: 170
+              Y: 10
+              Width: 130
+              Height: 28
+              RadiusTopLeft: 14
+              RadiusTopRight: 14
+              RadiusBottomLeft: 14
+              RadiusBottomRight: 14
+              Size: 11
+              FontWeight: =FontWeight.Semibold
+              DisplayMode: =DisplayMode.Disabled
+              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+              BorderStyle: =BorderStyle.None
+              DisabledColor: |
+                =If(
+                    varCurrentTicket.Status = "Pending Requester",
+                    RGBA(50, 49, 48, 1),
+                    RGBA(255, 255, 255, 1)
+                )
+              DisabledFill: |
+                =Switch(
+                    varCurrentTicket.Status,
+                    "New",                RGBA(0, 120, 212, 1),
+                    "Assigned",           RGBA(3, 131, 135, 1),
+                    "In Progress",        RGBA(202, 80, 16, 1),
+                    "Pending Requester",  RGBA(255, 185, 0, 1),
+                    "Resolved",           RGBA(16, 124, 16, 1),
+                    "Closed",             RGBA(96, 94, 92, 1),
+                    RGBA(210, 208, 206, 1)
+                )
+
+          # Priority Pill
+          - Button:
+              Name: btnDetailPriorityPill
+              Text: =varCurrentTicket.Priority
+              X: 310
+              Y: 10
+              Width: 90
+              Height: 28
+              RadiusTopLeft: 14
+              RadiusTopRight: 14
+              RadiusBottomLeft: 14
+              RadiusBottomRight: 14
+              Size: 11
+              FontWeight: =FontWeight.Semibold
+              DisplayMode: =DisplayMode.Disabled
+              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+              BorderStyle: =BorderStyle.None
+              DisabledColor: =RGBA(255, 255, 255, 1)
+              DisabledFill: |
+                =Switch(
+                    varCurrentTicket.Priority,
+                    "Critical", RGBA(164, 38, 44, 1),
+                    "High",     RGBA(216, 59, 1, 1),
+                    "Medium",   RGBA(255, 185, 0, 1),
+                    "Low",      RGBA(16, 124, 16, 1),
+                    RGBA(210, 208, 206, 1)
+                )
+
+          # SLA Due indicator
+          - Label:
+              Name: lblDetailSLA
+              Text: |
+                =If(
+                    IsBlank(varCurrentTicket.SLADueDate),
+                    "",
+                    "SLA: " & With(
+                        { hoursLeft: DateDiff(Now(), varCurrentTicket.SLADueDate, TimeUnit.Hours) },
+                        If(
+                            varCurrentTicket.Status = "Closed" || varCurrentTicket.Status = "Resolved",
+                            "Completed",
+                            If(
+                                hoursLeft < 0,
+                                "OVERDUE by " & Text(Abs(hoursLeft)) & "h",
+                                If(
+                                    hoursLeft < 4,
+                                    Text(hoursLeft) & "h remaining",
+                                    Text(varCurrentTicket.SLADueDate, "mmm dd, yyyy hh:mm AM/PM")
+                                )
+                            )
+                        )
+                    )
+                )
+              X: =Parent.Width - 48 - 300
+              Y: 8
+              Width: 300
+              Height: 28
+              Font: =Font.'Segoe UI'
+              Size: 12
+              FontWeight: =FontWeight.Semibold
+              Align: =Align.Right
+              VerticalAlign: =VerticalAlign.Middle
+              Color: |
+                =If(
+                    varCurrentTicket.Status = "Closed" || varCurrentTicket.Status = "Resolved",
+                    RGBA(96, 94, 92, 1),
+                    With(
+                        { hoursLeft: DateDiff(Now(), varCurrentTicket.SLADueDate, TimeUnit.Hours) },
+                        If(
+                            hoursLeft < 0,   RGBA(164, 38, 44, 1),
+                            hoursLeft < 4,   RGBA(216, 59, 1, 1),
+                            hoursLeft < 24,  RGBA(255, 185, 0, 1),
+                            RGBA(96, 94, 92, 1)
+                        )
+                    )
+                )
+
+          # Title
+          - Label:
+              Name: lblDetailTitle
+              Text: =varCurrentTicket.Title
+              X: 0
+              Y: 44
+              Width: =Parent.Width - 48
+              Height: 28
+              Font: =Font.'Segoe UI'
+              Size: 18
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(50, 49, 48, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+          # Meta line: Department, Category, Requester, Date
+          - Label:
+              Name: lblDetailMeta
+              Text: |
+                =varCurrentTicket.Department & " > " & varCurrentTicket.Category
+                & "  |  Submitted by " & varCurrentTicket.CreatedBy.DisplayName
+                & "  |  " & Text(varCurrentTicket.Created, "mmm dd, yyyy hh:mm AM/PM")
+              X: 0
+              Y: 72
+              Width: =Parent.Width - 48
+              Height: 20
+              Font: =Font.'Segoe UI'
+              Size: 12
+              Color: =RGBA(96, 94, 92, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+    # ==========================================================================
+    # TWO-COLUMN LAYOUT: Left = Details + Timeline, Right = Agent Panel
+    # ==========================================================================
+
+    # --------------------------------------------------------------------------
+    # LEFT COLUMN — Description, Attachments, Activity Timeline
+    # --------------------------------------------------------------------------
+    - Container:
+        Name: conLeftColumn
+        X: 20
+        Y: 188
+        Width: |
+          =If(
+              varIsAgent,
+              (Parent.Width - 60) * 0.6,
+              Parent.Width - 40
+          )
+        Height: =Parent.Height - 208
+
+        Children:
+          # ---- Description Card ----
+          - Container:
+              Name: conDescription
+              X: 0
+              Y: 0
+              Width: =Parent.Width
+              Height: 180
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 8
+              RadiusTopRight: 8
+              RadiusBottomLeft: 8
+              RadiusBottomRight: 8
+              DropShadow: =DropShadow.Light
+              PaddingLeft: 24
+              PaddingRight: 24
+              PaddingTop: 16
+              PaddingBottom: 16
+
+              Children:
+                - Label:
+                    Name: lblDescSectionTitle
+                    Text: ="Description"
+                    X: 0
+                    Y: 0
+                    Width: =Parent.Width - 48
+                    Height: 28
+                    Font: =Font.'Segoe UI'
+                    Size: 15
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - HtmlText:
+                    Name: htmDescription
+                    HtmlText: |
+                      ="<div style='font-family: Segoe UI, sans-serif; font-size: 14px; color: #323130; line-height: 1.6;'>"
+                      & Substitute(
+                            Substitute(varCurrentTicket.Description, Char(10), "<br>"),
+                            Char(13), ""
+                        )
+                      & "</div>"
+                    X: 0
+                    Y: 32
+                    Width: =Parent.Width - 48
+                    Height: 130
+
+          # ---- Attachments Card ----
+          - Container:
+              Name: conAttachments
+              X: 0
+              Y: 196
+              Width: =Parent.Width
+              Height: 120
+              Visible: =CountRows(varCurrentTicket.Attachments) > 0
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 8
+              RadiusTopRight: 8
+              RadiusBottomLeft: 8
+              RadiusBottomRight: 8
+              DropShadow: =DropShadow.Light
+              PaddingLeft: 24
+              PaddingRight: 24
+              PaddingTop: 16
+              PaddingBottom: 16
+
+              Children:
+                - Label:
+                    Name: lblAttachSectionTitle
+                    Text: ="Attachments (" & CountRows(varCurrentTicket.Attachments) & ")"
+                    X: 0
+                    Y: 0
+                    Width: =Parent.Width - 48
+                    Height: 28
+                    Font: =Font.'Segoe UI'
+                    Size: 15
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - Gallery:
+                    Name: galAttachments
+                    TemplateSize: 36
+                    X: 0
+                    Y: 32
+                    Width: =Parent.Width - 48
+                    Height: 72
+                    Items: =varCurrentTicket.Attachments
+
+                    TemplateChildren:
+                      - Button:
+                          Name: btnAttachFile
+                          Text: =ThisItem.DisplayName
+                          Width: =Parent.TemplateWidth
+                          Height: 32
+                          Fill: =RGBA(0, 0, 0, 0)
+                          Color: =RGBA(0, 120, 212, 1)
+                          HoverFill: =RGBA(0, 120, 212, 0.06)
+                          BorderStyle: =BorderStyle.None
+                          Font: =Font.'Segoe UI'
+                          Size: 13
+                          Align: =Align.Left
+                          Underline: true
+                          OnSelect: =Launch(ThisItem.AbsoluteUri)
+
+          # ---- Activity Timeline ----
+          - Container:
+              Name: conTimeline
+              X: 0
+              Y: |
+                =If(
+                    CountRows(varCurrentTicket.Attachments) > 0,
+                    332,
+                    196
+                )
+              Width: =Parent.Width
+              Height: |
+                =Parent.Height - If(
+                    CountRows(varCurrentTicket.Attachments) > 0,
+                    332,
+                    196
+                )
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 8
+              RadiusTopRight: 8
+              RadiusBottomLeft: 8
+              RadiusBottomRight: 8
+              DropShadow: =DropShadow.Light
+              PaddingLeft: 24
+              PaddingRight: 24
+              PaddingTop: 16
+              PaddingBottom: 16
+
+              Children:
+                - Label:
+                    Name: lblTimelineTitle
+                    Text: ="Activity"
+                    X: 0
+                    Y: 0
+                    Width: 200
+                    Height: 28
+                    Font: =Font.'Segoe UI'
+                    Size: 15
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                # Add comment input (for requester follow-ups or agent notes)
+                - TextInput:
+                    Name: txtNewComment
+                    X: 0
+                    Y: 36
+                    Width: =Parent.Width - 48 - 80
+                    Height: 40
+                    HintText: ="Add a comment..."
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    BorderColor: =RGBA(210, 208, 206, 1)
+                    FocusBorderColor: =RGBA(0, 120, 212, 1)
+                    RadiusTopLeft: 4
+                    RadiusTopRight: 4
+                    RadiusBottomLeft: 4
+                    RadiusBottomRight: 4
+
+                - Button:
+                    Name: btnAddComment
+                    Text: ="Post"
+                    X: =Parent.Width - 48 - 72
+                    Y: 36
+                    Width: 72
+                    Height: 40
+                    Fill: =RGBA(0, 120, 212, 1)
+                    Color: =RGBA(255, 255, 255, 1)
+                    HoverFill: =RGBA(16, 110, 190, 1)
+                    BorderStyle: =BorderStyle.None
+                    RadiusTopLeft: 4
+                    RadiusTopRight: 4
+                    RadiusBottomLeft: 4
+                    RadiusBottomRight: 4
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    DisplayMode: |
+                      =If(
+                          IsBlank(Trim(txtNewComment.Text)),
+                          DisplayMode.Disabled,
+                          DisplayMode.Edit
+                      )
+                    OnSelect: |
+                      =// Post comment to ServiceDeskComments list
+                      Patch(
+                          ServiceDeskComments,
+                          Defaults(ServiceDeskComments),
+                          {
+                              TicketID:    varSelectedTicketID,
+                              CommentText: Trim(txtNewComment.Text),
+                              CommentType: If(varIsAgent, "Agent Note", "Requester Reply"),
+                              Author: {
+                                  '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                  Claims: "i:0#.f|membership|" & Lower(User().Email),
+                                  DisplayName: User().FullName,
+                                  Email: User().Email
+                              }
+                          }
+                      );
+
+                      // Refresh timeline
+                      ClearCollect(
+                          colTicketComments,
+                          Sort(
+                              Filter(ServiceDeskComments, TicketID = varSelectedTicketID),
+                              Created,
+                              SortOrder.Descending
+                          )
+                      );
+
+                      Reset(txtNewComment);
+                      Notify("Comment posted", NotificationType.Success, 2000);
+
+                # Timeline Gallery
+                - Gallery:
+                    Name: galTimeline
+                    TemplateSize: 80
+                    X: 0
+                    Y: 88
+                    Width: =Parent.Width - 48
+                    Height: =Parent.Height - 120
+                    Items: =colTicketComments
+                    ShowScrollbar: true
+
+                    TemplateChildren:
+                      # Timeline dot and vertical line
+                      - Circle:
+                          Name: cirTimelineDot
+                          X: 4
+                          Y: 8
+                          Width: 12
+                          Height: 12
+                          Fill: |
+                            =Switch(
+                                ThisItem.CommentType,
+                                "Status Change",    RGBA(0, 120, 212, 1),
+                                "Agent Note",       RGBA(3, 131, 135, 1),
+                                "Requester Reply",  RGBA(255, 185, 0, 1),
+                                "Escalation",       RGBA(164, 38, 44, 1),
+                                "Resolution",       RGBA(16, 124, 16, 1),
+                                RGBA(96, 94, 92, 1)
+                            )
+
+                      - Rectangle:
+                          Name: recTimelineLine
+                          X: 9
+                          Y: 22
+                          Width: 2
+                          Height: =Parent.TemplateHeight - 26
+                          Fill: =RGBA(237, 235, 233, 1)
+                          Visible: =!IsLast(ThisItem, galTimeline.AllItems)
+
+                      # Comment content
+                      - Label:
+                          Name: lblCommentAuthor
+                          Text: =ThisItem.Author.DisplayName & "  ·  " & Text(ThisItem.Created, "mmm dd, hh:mm AM/PM")
+                          X: 28
+                          Y: 4
+                          Width: =Parent.TemplateWidth - 40
+                          Height: 20
+                          Font: =Font.'Segoe UI'
+                          Size: 11
+                          FontWeight: =FontWeight.Semibold
+                          Color: =RGBA(96, 94, 92, 1)
+
+                      - Label:
+                          Name: lblCommentType
+                          Text: =ThisItem.CommentType
+                          X: 28
+                          Y: 24
+                          Width: 120
+                          Height: 18
+                          Font: =Font.'Segoe UI'
+                          Size: 10
+                          FontWeight: =FontWeight.Semibold
+                          Color: |
+                            =Switch(
+                                ThisItem.CommentType,
+                                "Status Change",    RGBA(0, 120, 212, 1),
+                                "Agent Note",       RGBA(3, 131, 135, 1),
+                                "Requester Reply",  RGBA(202, 80, 16, 1),
+                                "Escalation",       RGBA(164, 38, 44, 1),
+                                "Resolution",       RGBA(16, 124, 16, 1),
+                                RGBA(96, 94, 92, 1)
+                            )
+
+                      - Label:
+                          Name: lblCommentText
+                          Text: =ThisItem.CommentText
+                          X: 28
+                          Y: 44
+                          Width: =Parent.TemplateWidth - 40
+                          Height: 32
+                          Font: =Font.'Segoe UI'
+                          Size: 13
+                          Color: =RGBA(50, 49, 48, 1)
+                          Overflow: =Overflow.Hidden
+
+    # --------------------------------------------------------------------------
+    # RIGHT COLUMN — Agent Edit Panel (visible only to agents)
+    # --------------------------------------------------------------------------
+    - Container:
+        Name: conAgentPanel
+        Visible: =varIsAgent
+        X: =(Parent.Width - 60) * 0.6 + 40
+        Y: 188
+        Width: =(Parent.Width - 60) * 0.4
+        Height: =Parent.Height - 208
+
+        Children:
+          # ---- Agent Actions Card ----
+          - Container:
+              Name: conAgentActions
+              X: 0
+              Y: 0
+              Width: =Parent.Width
+              Height: 520
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 8
+              RadiusTopRight: 8
+              RadiusBottomLeft: 8
+              RadiusBottomRight: 8
+              DropShadow: =DropShadow.Light
+              PaddingLeft: 20
+              PaddingRight: 20
+              PaddingTop: 16
+              PaddingBottom: 16
+
+              Children:
+                - Label:
+                    Name: lblAgentPanelTitle
+                    Text: ="Agent Actions"
+                    X: 0
+                    Y: 0
+                    Width: =Parent.Width - 40
+                    Height: 28
+                    Font: =Font.'Segoe UI'
+                    Size: 15
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - Rectangle:
+                    Name: recAgentSep
+                    X: 0
+                    Y: 34
+                    Width: =Parent.Width - 40
+                    Height: 1
+                    Fill: =RGBA(237, 235, 233, 1)
+
+                # ---- Change Status ----
+                - Label:
+                    Name: lblChangeStatus
+                    Text: ="Status"
+                    X: 0
+                    Y: 48
+                    Width: =Parent.Width - 40
+                    Height: 24
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - Dropdown:
+                    Name: ddlChangeStatus
+                    # Show only valid next statuses based on current status
+                    Items: |
+                      =Switch(
+                          varCurrentTicket.Status,
+                          "New",
+                              ["New", "Assigned"],
+                          "Assigned",
+                              ["Assigned", "In Progress"],
+                          "In Progress",
+                              ["In Progress", "Pending Requester", "Resolved"],
+                          "Pending Requester",
+                              ["Pending Requester", "In Progress", "Resolved"],
+                          "Resolved",
+                              ["Resolved", "Closed", "In Progress"],
+                          "Closed",
+                              ["Closed"],
+                          [varCurrentTicket.Status]
+                      )
+                    Default: =varCurrentTicket.Status
+                    X: 0
+                    Y: 74
+                    Width: =Parent.Width - 40
+                    Height: 40
+                    BorderColor: =RGBA(210, 208, 206, 1)
+                    FocusBorderColor: =RGBA(0, 120, 212, 1)
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+
+                # ---- Assign To ----
+                - Label:
+                    Name: lblAssignTo
+                    Text: ="Assign To"
+                    X: 0
+                    Y: 128
+                    Width: =Parent.Width - 40
+                    Height: 24
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - ComboBox:
+                    Name: cmbAssignTo
+                    Items: |
+                      =Office365Users.SearchUser({searchTerm: cmbAssignTo.SearchText, top: 15})
+                    DefaultSelectedItems: |
+                      =If(
+                          !IsBlank(varCurrentTicket.AssignedTo),
+                          [varCurrentTicket.AssignedTo],
+                          Blank()
+                      )
+                    X: 0
+                    Y: 154
+                    Width: =Parent.Width - 40
+                    Height: 40
+                    DisplayFields: =["DisplayName"]
+                    SearchFields: =["DisplayName", "Mail"]
+                    SelectMultiple: false
+                    IsSearchable: true
+                    BorderColor: =RGBA(210, 208, 206, 1)
+                    FocusBorderColor: =RGBA(0, 120, 212, 1)
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+
+                # ---- Resolution Notes ----
+                - Label:
+                    Name: lblResolutionNotes
+                    Text: ="Resolution Notes"
+                    X: 0
+                    Y: 210
+                    Width: =Parent.Width - 40
+                    Height: 24
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - TextInput:
+                    Name: txtResolutionNotes
+                    X: 0
+                    Y: 236
+                    Width: =Parent.Width - 40
+                    Height: 100
+                    Mode: =TextMode.MultiLine
+                    Default: =varCurrentTicket.ResolutionNotes
+                    HintText: ="Describe the resolution or actions taken..."
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    BorderColor: =RGBA(210, 208, 206, 1)
+                    FocusBorderColor: =RGBA(0, 120, 212, 1)
+                    RadiusTopLeft: 4
+                    RadiusTopRight: 4
+                    RadiusBottomLeft: 4
+                    RadiusBottomRight: 4
+
+                # ---- Save Changes Button ----
+                - Button:
+                    Name: btnSaveChanges
+                    Text: ="Save Changes"
+                    X: 0
+                    Y: 352
+                    Width: =Parent.Width - 40
+                    Height: 44
+                    Fill: =RGBA(0, 120, 212, 1)
+                    HoverFill: =RGBA(16, 110, 190, 1)
+                    Color: =RGBA(255, 255, 255, 1)
+                    BorderStyle: =BorderStyle.None
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+                    FontWeight: =FontWeight.Semibold
+                    OnSelect: |
+                      =Set(varSaving, true);
+
+                      // Build the patch record
+                      Set(
+                          varPatchResult,
+                          Patch(
+                              ServiceDeskTickets,
+                              LookUp(ServiceDeskTickets, ID = varSelectedTicketID),
+                              {
+                                  Status: ddlChangeStatus.Selected.Value,
+                                  AssignedTo: If(
+                                      CountRows(cmbAssignTo.SelectedItems) > 0,
+                                      {
+                                          '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                          Claims: "i:0#.f|membership|" & Lower(First(cmbAssignTo.SelectedItems).Mail),
+                                          DisplayName: First(cmbAssignTo.SelectedItems).DisplayName,
+                                          Email: First(cmbAssignTo.SelectedItems).Mail
+                                      },
+                                      Blank()
+                                  ),
+                                  ResolutionNotes: txtResolutionNotes.Text,
+                                  // Set resolved date if moving to Resolved
+                                  ResolvedDate: If(
+                                      ddlChangeStatus.Selected.Value = "Resolved"
+                                      && varCurrentTicket.Status <> "Resolved",
+                                      Now(),
+                                      varCurrentTicket.ResolvedDate
+                                  ),
+                                  // Set closed date if moving to Closed
+                                  ClosedDate: If(
+                                      ddlChangeStatus.Selected.Value = "Closed"
+                                      && varCurrentTicket.Status <> "Closed",
+                                      Now(),
+                                      varCurrentTicket.ClosedDate
+                                  )
+                              }
+                          )
+                      );
+
+                      // Log status change as activity
+                      If(
+                          ddlChangeStatus.Selected.Value <> varCurrentTicket.Status,
+                          Patch(
+                              ServiceDeskComments,
+                              Defaults(ServiceDeskComments),
+                              {
+                                  TicketID:    varSelectedTicketID,
+                                  CommentText: "Status changed from " & varCurrentTicket.Status
+                                              & " to " & ddlChangeStatus.Selected.Value,
+                                  CommentType: "Status Change",
+                                  Author: {
+                                      '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                      Claims: "i:0#.f|membership|" & Lower(User().Email),
+                                      DisplayName: User().FullName,
+                                      Email: User().Email
+                                  }
+                              }
+                          )
+                      );
+
+                      If(
+                          IsError(varPatchResult),
+                          Notify("Failed to save changes. Please try again.", NotificationType.Error, 3000),
+                          // Success
+                          Notify("Ticket updated successfully.", NotificationType.Success, 2000);
+                          // Refresh the ticket data
+                          Set(varCurrentTicket, LookUp(ServiceDeskTickets, ID = varSelectedTicketID));
+                          ClearCollect(
+                              colTicketComments,
+                              Sort(
+                                  Filter(ServiceDeskComments, TicketID = varSelectedTicketID),
+                                  Created,
+                                  SortOrder.Descending
+                              )
+                          )
+                      );
+
+                      Set(varSaving, false);
+
+                # ---- Escalate Button ----
+                - Button:
+                    Name: btnEscalate
+                    Text: ="Escalate"
+                    X: 0
+                    Y: 410
+                    Width: =(Parent.Width - 40 - 12) / 2
+                    Height: 44
+                    Fill: =RGBA(0, 0, 0, 0)
+                    Color: =RGBA(164, 38, 44, 1)
+                    HoverFill: =RGBA(164, 38, 44, 0.08)
+                    BorderStyle: =BorderStyle.Solid
+                    BorderColor: =RGBA(164, 38, 44, 1)
+                    BorderThickness: 2
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+                    FontWeight: =FontWeight.Semibold
+                    Visible: |
+                      =varCurrentTicket.Status <> "Closed"
+                      && varCurrentTicket.Status <> "Resolved"
+                    OnSelect: =Set(varShowEscalateDialog, true)
+
+                # ---- Close Ticket Button ----
+                - Button:
+                    Name: btnCloseTicket
+                    Text: ="Close Ticket"
+                    X: =(Parent.Width - 40 + 12) / 2
+                    Y: 410
+                    Width: =(Parent.Width - 40 - 12) / 2
+                    Height: 44
+                    Fill: =RGBA(0, 0, 0, 0)
+                    Color: =RGBA(96, 94, 92, 1)
+                    HoverFill: =RGBA(0, 0, 0, 0.05)
+                    BorderStyle: =BorderStyle.Solid
+                    BorderColor: =RGBA(96, 94, 92, 1)
+                    BorderThickness: 2
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+                    FontWeight: =FontWeight.Semibold
+                    Visible: |
+                      =varCurrentTicket.Status <> "Closed"
+                    OnSelect: =Set(varShowCloseDialog, true)
+
+    # ==========================================================================
+    # ESCALATION DIALOG
+    # ==========================================================================
+    - Container:
+        Name: conEscalateOverlay
+        Visible: =varShowEscalateDialog
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: =Parent.Height
+        Fill: =RGBA(0, 0, 0, 0.4)
+
+        Children:
+          - Container:
+              Name: conEscalateDialog
+              X: =(Parent.Width - 440) / 2
+              Y: =(Parent.Height - 320) / 2
+              Width: 440
+              Height: 320
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 8
+              RadiusTopRight: 8
+              RadiusBottomLeft: 8
+              RadiusBottomRight: 8
+              DropShadow: =DropShadow.Bold
+              PaddingLeft: 24
+              PaddingRight: 24
+              PaddingTop: 24
+              PaddingBottom: 24
+
+              Children:
+                - Label:
+                    Name: lblEscTitle
+                    Text: ="Escalate Ticket"
+                    Width: 392
+                    Height: 32
+                    Font: =Font.'Segoe UI'
+                    Size: 18
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(164, 38, 44, 1)
+
+                - Label:
+                    Name: lblEscBody
+                    Text: ="This will increase priority and notify management. Add a reason below:"
+                    Y: 38
+                    Width: 392
+                    Height: 40
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - TextInput:
+                    Name: txtEscReason
+                    Y: 84
+                    Width: 392
+                    Height: 100
+                    Mode: =TextMode.MultiLine
+                    HintText: ="Reason for escalation..."
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    BorderColor: =RGBA(210, 208, 206, 1)
+                    FocusBorderColor: =RGBA(164, 38, 44, 1)
+
+                - Dropdown:
+                    Name: ddlEscNewPriority
+                    Items: =["High", "Critical"]
+                    Default: |
+                      =If(
+                          varCurrentTicket.Priority = "Critical",
+                          "Critical",
+                          "High"
+                      )
+                    Y: 196
+                    Width: 392
+                    Height: 40
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+
+                - Container:
+                    Name: conEscActions
+                    LayoutDirection: Horizontal
+                    Y: 252
+                    Width: 392
+                    Height: 40
+                    Gap: 12
+
+                    Children:
+                      - Button:
+                          Name: btnEscConfirm
+                          Text: ="Escalate"
+                          Width: 120
+                          Height: 40
+                          Fill: =RGBA(164, 38, 44, 1)
+                          Color: =RGBA(255, 255, 255, 1)
+                          HoverFill: =RGBA(140, 30, 36, 1)
+                          BorderStyle: =BorderStyle.None
+                          RadiusTopLeft: 4
+                          RadiusTopRight: 4
+                          RadiusBottomLeft: 4
+                          RadiusBottomRight: 4
+                          Font: =Font.'Segoe UI'
+                          Size: 14
+                          FontWeight: =FontWeight.Semibold
+                          OnSelect: |
+                            =// Patch escalation
+                            Patch(
+                                ServiceDeskTickets,
+                                LookUp(ServiceDeskTickets, ID = varSelectedTicketID),
+                                {
+                                    Priority: ddlEscNewPriority.Selected.Value,
+                                    IsEscalated: true
+                                }
+                            );
+
+                            // Log escalation activity
+                            Patch(
+                                ServiceDeskComments,
+                                Defaults(ServiceDeskComments),
+                                {
+                                    TicketID:    varSelectedTicketID,
+                                    CommentText: "Escalated to " & ddlEscNewPriority.Selected.Value
+                                                & ". Reason: " & txtEscReason.Text,
+                                    CommentType: "Escalation",
+                                    Author: {
+                                        '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                        Claims: "i:0#.f|membership|" & Lower(User().Email),
+                                        DisplayName: User().FullName,
+                                        Email: User().Email
+                                    }
+                                }
+                            );
+
+                            // Trigger escalation flow
+                            ServiceDeskEscalationFlow.Run(
+                                varSelectedTicketID,
+                                varCurrentTicket.TicketID,
+                                ddlEscNewPriority.Selected.Value,
+                                txtEscReason.Text,
+                                User().Email
+                            );
+
+                            Set(varShowEscalateDialog, false);
+
+                            // Refresh
+                            Set(varCurrentTicket, LookUp(ServiceDeskTickets, ID = varSelectedTicketID));
+                            ClearCollect(
+                                colTicketComments,
+                                Sort(
+                                    Filter(ServiceDeskComments, TicketID = varSelectedTicketID),
+                                    Created, SortOrder.Descending
+                                )
+                            );
+
+                            Notify("Ticket escalated.", NotificationType.Warning, 3000);
+
+                      - Button:
+                          Name: btnEscCancel
+                          Text: ="Cancel"
+                          Width: 100
+                          Height: 40
+                          Fill: =RGBA(0, 0, 0, 0)
+                          Color: =RGBA(50, 49, 48, 1)
+                          HoverFill: =RGBA(0, 0, 0, 0.05)
+                          BorderStyle: =BorderStyle.Solid
+                          BorderColor: =RGBA(210, 208, 206, 1)
+                          RadiusTopLeft: 4
+                          RadiusTopRight: 4
+                          RadiusBottomLeft: 4
+                          RadiusBottomRight: 4
+                          Font: =Font.'Segoe UI'
+                          Size: 14
+                          OnSelect: =Set(varShowEscalateDialog, false)
+
+    # ==========================================================================
+    # CLOSE TICKET DIALOG
+    # ==========================================================================
+    - Container:
+        Name: conCloseOverlay
+        Visible: =varShowCloseDialog
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: =Parent.Height
+        Fill: =RGBA(0, 0, 0, 0.4)
+
+        Children:
+          - Container:
+              Name: conCloseDialog
+              X: =(Parent.Width - 440) / 2
+              Y: =(Parent.Height - 280) / 2
+              Width: 440
+              Height: 280
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 8
+              RadiusTopRight: 8
+              RadiusBottomLeft: 8
+              RadiusBottomRight: 8
+              DropShadow: =DropShadow.Bold
+              PaddingLeft: 24
+              PaddingRight: 24
+              PaddingTop: 24
+              PaddingBottom: 24
+
+              Children:
+                - Label:
+                    Name: lblCloseTitle
+                    Text: ="Close Ticket"
+                    Width: 392
+                    Height: 32
+                    Font: =Font.'Segoe UI'
+                    Size: 18
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - Label:
+                    Name: lblCloseBody
+                    Text: ="Please confirm resolution notes before closing this ticket."
+                    Y: 38
+                    Width: 392
+                    Height: 30
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    Color: =RGBA(96, 94, 92, 1)
+
+                - TextInput:
+                    Name: txtCloseNotes
+                    Y: 76
+                    Width: 392
+                    Height: 100
+                    Mode: =TextMode.MultiLine
+                    Default: =varCurrentTicket.ResolutionNotes
+                    HintText: ="Final resolution notes..."
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    BorderColor: =RGBA(210, 208, 206, 1)
+
+                - Container:
+                    Name: conCloseActions
+                    LayoutDirection: Horizontal
+                    Y: 196
+                    Width: 392
+                    Height: 40
+                    Gap: 12
+
+                    Children:
+                      - Button:
+                          Name: btnCloseConfirm
+                          Text: ="Close Ticket"
+                          Width: 140
+                          Height: 40
+                          Fill: =RGBA(96, 94, 92, 1)
+                          Color: =RGBA(255, 255, 255, 1)
+                          HoverFill: =RGBA(72, 70, 68, 1)
+                          BorderStyle: =BorderStyle.None
+                          RadiusTopLeft: 4
+                          RadiusTopRight: 4
+                          RadiusBottomLeft: 4
+                          RadiusBottomRight: 4
+                          Font: =Font.'Segoe UI'
+                          Size: 14
+                          FontWeight: =FontWeight.Semibold
+                          OnSelect: |
+                            =Patch(
+                                ServiceDeskTickets,
+                                LookUp(ServiceDeskTickets, ID = varSelectedTicketID),
+                                {
+                                    Status:          "Closed",
+                                    ResolutionNotes: txtCloseNotes.Text,
+                                    ClosedDate:      Now(),
+                                    ResolvedDate:    If(
+                                                         IsBlank(varCurrentTicket.ResolvedDate),
+                                                         Now(),
+                                                         varCurrentTicket.ResolvedDate
+                                                     )
+                                }
+                            );
+
+                            // Log closure
+                            Patch(
+                                ServiceDeskComments,
+                                Defaults(ServiceDeskComments),
+                                {
+                                    TicketID:    varSelectedTicketID,
+                                    CommentText: "Ticket closed. Resolution: " & txtCloseNotes.Text,
+                                    CommentType: "Resolution",
+                                    Author: {
+                                        '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                        Claims: "i:0#.f|membership|" & Lower(User().Email),
+                                        DisplayName: User().FullName,
+                                        Email: User().Email
+                                    }
+                                }
+                            );
+
+                            Set(varShowCloseDialog, false);
+                            Set(varCurrentTicket, LookUp(ServiceDeskTickets, ID = varSelectedTicketID));
+                            ClearCollect(
+                                colTicketComments,
+                                Sort(
+                                    Filter(ServiceDeskComments, TicketID = varSelectedTicketID),
+                                    Created, SortOrder.Descending
+                                )
+                            );
+                            Notify("Ticket closed.", NotificationType.Success, 2000);
+
+                      - Button:
+                          Name: btnCloseCancel
+                          Text: ="Cancel"
+                          Width: 100
+                          Height: 40
+                          Fill: =RGBA(0, 0, 0, 0)
+                          Color: =RGBA(50, 49, 48, 1)
+                          HoverFill: =RGBA(0, 0, 0, 0.05)
+                          BorderStyle: =BorderStyle.Solid
+                          BorderColor: =RGBA(210, 208, 206, 1)
+                          RadiusTopLeft: 4
+                          RadiusTopRight: 4
+                          RadiusBottomLeft: 4
+                          RadiusBottomRight: 4
+                          Font: =Font.'Segoe UI'
+                          Size: 14
+                          OnSelect: =Set(varShowCloseDialog, false)
+
+    # ==========================================================================
+    # LOADING OVERLAY
+    # ==========================================================================
+    - Container:
+        Name: conDetailLoading
+        Visible: =varLoadingDetail || varSaving
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: =Parent.Height
+        Fill: =RGBA(250, 249, 248, 0.85)
+
+        Children:
+          - Label:
+              Name: lblDetailLoadingText
+              Text: =If(varSaving, "Saving...", "Loading ticket...")
+              Width: 200
+              Height: 40
+              X: =(Parent.Width - 200) / 2
+              Y: =(Parent.Height - 40) / 2
+              Font: =Font.'Segoe UI'
+              Size: 14
+              Color: =RGBA(96, 94, 92, 1)
+              Align: =Align.Center
+              VerticalAlign: =VerticalAlign.Middle

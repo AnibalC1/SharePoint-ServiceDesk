@@ -1,0 +1,428 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "hideSelection": false,
+  "hideColumnHeader": false,
+  "rowFormatter": {
+    "elmType": "div",
+    "style": {
+      "display": "flex",
+      "align-items": "center",
+      "padding": "12px 16px",
+      "margin": "4px 0",
+      "border-radius": "8px",
+      "background-color": "#ffffff",
+      "border": "1px solid #EDEBE9",
+      "box-shadow": "0 1px 3px rgba(0,0,0,0.06)",
+      "transition": "box-shadow 0.2s ease, border-color 0.2s ease",
+      "gap": "16px",
+      "min-height": "52px"
+    },
+    "customCardProps": {
+      "openOnEvent": "hover",
+      "directionalHint": "bottomCenter",
+      "isBeakVisible": true,
+      "formatter": {
+        "elmType": "div",
+        "style": {
+          "padding": "20px",
+          "min-width": "320px",
+          "max-width": "480px"
+        },
+        "children": [
+          {
+            "elmType": "div",
+            "style": {
+              "display": "flex",
+              "align-items": "center",
+              "gap": "12px",
+              "margin-bottom": "12px",
+              "padding-bottom": "12px",
+              "border-bottom": "1px solid #EDEBE9"
+            },
+            "children": [
+              {
+                "elmType": "span",
+                "txtContent": "[$TicketID]",
+                "style": {
+                  "font-family": "'Cascadia Code', 'Consolas', monospace",
+                  "font-size": "14px",
+                  "font-weight": "700",
+                  "color": "#0078D4",
+                  "padding": "4px 10px",
+                  "background-color": "#F3F2F1",
+                  "border-radius": "6px",
+                  "border": "1px solid #E1DFDD"
+                }
+              },
+              {
+                "elmType": "span",
+                "txtContent": "[$Title]",
+                "style": {
+                  "font-size": "15px",
+                  "font-weight": "700",
+                  "color": "#323130",
+                  "flex": "1"
+                }
+              }
+            ]
+          },
+          {
+            "elmType": "div",
+            "style": {
+              "display": "flex",
+              "flex-direction": "column",
+              "gap": "8px"
+            },
+            "children": [
+              {
+                "elmType": "div",
+                "style": {
+                  "display": "flex",
+                  "align-items": "center",
+                  "gap": "8px"
+                },
+                "children": [
+                  {
+                    "elmType": "span",
+                    "style": {
+                      "font-size": "12px",
+                      "color": "#605E5C",
+                      "width": "70px"
+                    },
+                    "txtContent": "Status"
+                  },
+                  {
+                    "elmType": "span",
+                    "txtContent": "[$Status]",
+                    "style": {
+                      "padding": "2px 10px",
+                      "border-radius": "12px",
+                      "font-size": "11px",
+                      "font-weight": "600",
+                      "color": "=if([$Status] == 'Pending Requester', '#323130', '#ffffff')",
+                      "background-color": "=if([$Status] == 'New', '#0078D4', if([$Status] == 'Assigned', '#038387', if([$Status] == 'In Progress', '#CA5010', if([$Status] == 'Pending Requester', '#FFB900', if([$Status] == 'Resolved', '#107C10', if([$Status] == 'Closed', '#605E5C', '#D2D0CE'))))))"
+                    }
+                  }
+                ]
+              },
+              {
+                "elmType": "div",
+                "style": {
+                  "display": "flex",
+                  "align-items": "center",
+                  "gap": "8px"
+                },
+                "children": [
+                  {
+                    "elmType": "span",
+                    "style": {
+                      "font-size": "12px",
+                      "color": "#605E5C",
+                      "width": "70px"
+                    },
+                    "txtContent": "Priority"
+                  },
+                  {
+                    "elmType": "span",
+                    "txtContent": "[$Priority]",
+                    "style": {
+                      "padding": "2px 10px",
+                      "border-radius": "12px",
+                      "font-size": "11px",
+                      "font-weight": "600",
+                      "color": "=if([$Priority] == 'Low', '#323130', '#ffffff')",
+                      "background-color": "=if([$Priority] == 'Low', '#F3F2F1', if([$Priority] == 'Medium', '#0078D4', if([$Priority] == 'High', '#D83B01', if([$Priority] == 'Critical', '#A4262C', '#D2D0CE'))))"
+                    }
+                  }
+                ]
+              },
+              {
+                "elmType": "div",
+                "style": {
+                  "display": "flex",
+                  "align-items": "center",
+                  "gap": "8px"
+                },
+                "children": [
+                  {
+                    "elmType": "span",
+                    "style": {
+                      "font-size": "12px",
+                      "color": "#605E5C",
+                      "width": "70px"
+                    },
+                    "txtContent": "Assigned To"
+                  },
+                  {
+                    "elmType": "span",
+                    "txtContent": "=if([$AssignedTo.title] == '', 'Unassigned', [$AssignedTo.title])",
+                    "style": {
+                      "font-size": "12px",
+                      "color": "#323130",
+                      "font-weight": "600"
+                    }
+                  }
+                ]
+              },
+              {
+                "elmType": "div",
+                "style": {
+                  "display": "flex",
+                  "align-items": "center",
+                  "gap": "8px"
+                },
+                "children": [
+                  {
+                    "elmType": "span",
+                    "style": {
+                      "font-size": "12px",
+                      "color": "#605E5C",
+                      "width": "70px"
+                    },
+                    "txtContent": "SLA Due"
+                  },
+                  {
+                    "elmType": "span",
+                    "txtContent": "=if([$SLADue] == '', 'Not set', toLocaleDateString([$SLADue]))",
+                    "style": {
+                      "font-size": "12px",
+                      "font-weight": "600",
+                      "color": "=if([$SLADue] == '', '#A19F9D', if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, '#107C10', if(Number([$SLADue]) < Number(@now), '#A4262C', if(Number([$SLADue]) - Number(@now) <= 14400000, '#D83B01', if(Number([$SLADue]) - Number(@now) <= 86400000, '#CA5010', '#107C10')))))"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "children": [
+      {
+        "elmType": "div",
+        "style": {
+          "display": "flex",
+          "align-items": "center",
+          "flex-shrink": "0",
+          "min-width": "100px"
+        },
+        "children": [
+          {
+            "elmType": "span",
+            "txtContent": "[$TicketID]",
+            "style": {
+              "font-family": "'Cascadia Code', 'Fira Code', 'Consolas', 'Courier New', monospace",
+              "font-size": "13px",
+              "font-weight": "700",
+              "color": "#0078D4",
+              "padding": "4px 10px",
+              "background-color": "#F3F2F1",
+              "border-radius": "6px",
+              "border": "1px solid #E1DFDD",
+              "letter-spacing": "0.5px"
+            }
+          }
+        ]
+      },
+      {
+        "elmType": "div",
+        "style": {
+          "flex": "1",
+          "min-width": "0",
+          "overflow": "hidden"
+        },
+        "children": [
+          {
+            "elmType": "a",
+            "txtContent": "[$Title]",
+            "attributes": {
+              "href": "=[$ID.serverRelativeUrl]",
+              "target": "_blank"
+            },
+            "style": {
+              "font-size": "14px",
+              "font-weight": "600",
+              "color": "#323130",
+              "text-decoration": "none",
+              "overflow": "hidden",
+              "text-overflow": "ellipsis",
+              "white-space": "nowrap",
+              "display": "block"
+            }
+          }
+        ]
+      },
+      {
+        "elmType": "div",
+        "style": {
+          "display": "flex",
+          "align-items": "center",
+          "gap": "8px",
+          "flex-shrink": "0"
+        },
+        "children": [
+          {
+            "elmType": "span",
+            "txtContent": "[$Status]",
+            "style": {
+              "display": "inline-block",
+              "padding": "3px 12px",
+              "border-radius": "14px",
+              "font-size": "11px",
+              "font-weight": "600",
+              "white-space": "nowrap",
+              "text-align": "center",
+              "min-width": "70px",
+              "color": "=if([$Status] == 'Pending Requester', '#323130', '#ffffff')",
+              "background-color": "=if([$Status] == 'New', '#0078D4', if([$Status] == 'Assigned', '#038387', if([$Status] == 'In Progress', '#CA5010', if([$Status] == 'Pending Requester', '#FFB900', if([$Status] == 'Resolved', '#107C10', if([$Status] == 'Closed', '#605E5C', '#D2D0CE'))))))"
+            }
+          },
+          {
+            "elmType": "span",
+            "style": {
+              "display": "inline-flex",
+              "align-items": "center",
+              "gap": "4px",
+              "padding": "3px 12px",
+              "border-radius": "14px",
+              "font-size": "11px",
+              "font-weight": "600",
+              "white-space": "nowrap",
+              "text-align": "center",
+              "min-width": "60px",
+              "justify-content": "center",
+              "color": "=if([$Priority] == 'Low', '#323130', '#ffffff')",
+              "background-color": "=if([$Priority] == 'Low', '#F3F2F1', if([$Priority] == 'Medium', '#0078D4', if([$Priority] == 'High', '#D83B01', if([$Priority] == 'Critical', '#A4262C', '#D2D0CE'))))"
+            },
+            "children": [
+              {
+                "elmType": "span",
+                "attributes": {
+                  "iconName": "=if([$Priority] == 'Critical', 'Warning', '')"
+                },
+                "style": {
+                  "display": "=if([$Priority] == 'Critical', 'inline', 'none')",
+                  "font-size": "10px"
+                }
+              },
+              {
+                "elmType": "span",
+                "txtContent": "[$Priority]"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "elmType": "div",
+        "style": {
+          "display": "flex",
+          "align-items": "center",
+          "gap": "8px",
+          "flex-shrink": "0",
+          "min-width": "140px"
+        },
+        "children": [
+          {
+            "elmType": "div",
+            "style": {
+              "display": "=if([$AssignedTo.title] == '', 'none', 'flex')",
+              "align-items": "center",
+              "gap": "8px"
+            },
+            "children": [
+              {
+                "elmType": "img",
+                "attributes": {
+                  "src": "=getUserImage([$AssignedTo.email], 'S')"
+                },
+                "style": {
+                  "width": "28px",
+                  "height": "28px",
+                  "border-radius": "50%",
+                  "border": "2px solid #E1DFDD",
+                  "object-fit": "cover"
+                }
+              },
+              {
+                "elmType": "span",
+                "txtContent": "[$AssignedTo.title]",
+                "style": {
+                  "font-size": "12px",
+                  "font-weight": "600",
+                  "color": "#323130",
+                  "overflow": "hidden",
+                  "text-overflow": "ellipsis",
+                  "white-space": "nowrap",
+                  "max-width": "100px"
+                }
+              }
+            ]
+          },
+          {
+            "elmType": "div",
+            "style": {
+              "display": "=if([$AssignedTo.title] == '', 'flex', 'none')",
+              "align-items": "center",
+              "gap": "6px"
+            },
+            "children": [
+              {
+                "elmType": "span",
+                "attributes": {
+                  "iconName": "Contact"
+                },
+                "style": {
+                  "font-size": "14px",
+                  "color": "#A19F9D"
+                }
+              },
+              {
+                "elmType": "span",
+                "txtContent": "Unassigned",
+                "style": {
+                  "font-size": "12px",
+                  "color": "#A19F9D",
+                  "font-style": "italic"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "elmType": "div",
+        "style": {
+          "display": "flex",
+          "align-items": "center",
+          "gap": "6px",
+          "flex-shrink": "0",
+          "min-width": "120px"
+        },
+        "children": [
+          {
+            "elmType": "span",
+            "attributes": {
+              "iconName": "=if([$SLADue] == '', '', if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, 'SkypeCheck', if(Number([$SLADue]) < Number(@now), 'AlertSolid', 'Clock')))"
+            },
+            "style": {
+              "display": "=if([$SLADue] == '', 'none', 'inline')",
+              "font-size": "12px",
+              "color": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, '#107C10', if(Number([$SLADue]) < Number(@now), '#A4262C', if(Number([$SLADue]) - Number(@now) <= 14400000, '#D83B01', if(Number([$SLADue]) - Number(@now) <= 86400000, '#CA5010', '#107C10'))))"
+            }
+          },
+          {
+            "elmType": "span",
+            "txtContent": "=if([$SLADue] == '', 'No SLA', if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, toLocaleDateString([$SLADue]), if(Number([$SLADue]) < Number(@now), 'OVERDUE', toLocaleDateString([$SLADue]))))",
+            "style": {
+              "font-size": "12px",
+              "font-weight": "=if([$SLADue] == '', '400', '600')",
+              "color": "=if([$SLADue] == '', '#A19F9D', if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, '#107C10', if(Number([$SLADue]) < Number(@now), '#A4262C', if(Number([$SLADue]) - Number(@now) <= 14400000, '#D83B01', if(Number([$SLADue]) - Number(@now) <= 86400000, '#CA5010', '#107C10')))))",
+              "font-style": "=if([$SLADue] == '', 'italic', 'normal')"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

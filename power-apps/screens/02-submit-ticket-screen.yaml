@@ -1,0 +1,923 @@
+# ==============================================================================
+# Service Desk - Submit Ticket Screen
+# Power Apps Canvas App (YAML Code-First Format)
+# ==============================================================================
+# New ticket creation form with cascading dropdowns, visual priority selector,
+# attachment support, validation, and Power Automate trigger on submit.
+# Data source: SharePoint list "ServiceDeskTickets"
+# Lookup list: "ServiceDeskCategories" (columns: Title, Department)
+# ==============================================================================
+
+Screen:
+  Name: scrSubmitTicket
+  Fill: =RGBA(250, 249, 248, 1)  # Background #FAF9F8
+
+  OnVisible: |
+    =// Reset form state
+    Set(varSubmitting, false);
+    Set(varSubmitSuccess, false);
+    Set(varSubmitError, "");
+    Set(varSelectedPriority, "Medium");
+    Set(varSelectedDepartment, Blank());
+    Set(varSelectedCategory, Blank());
+    Set(varFormValid, false);
+
+    // Load categories lookup for cascading dropdown
+    ClearCollect(
+        colCategories,
+        ShowColumns(
+            ServiceDeskCategories,
+            "Title", "Department"
+        )
+    );
+
+    // Reset all form fields
+    Reset(txtTicketTitle);
+    Reset(txtTicketDescription);
+    Reset(ddlDepartment);
+    Reset(ddlCategory);
+    Reset(attTicketAttachments);
+
+  Children:
+
+    # ==========================================================================
+    # TOP BAR WITH BACK NAVIGATION
+    # ==========================================================================
+    - Container:
+        Name: conSubmitTopBar
+        LayoutDirection: Horizontal
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: 56
+        Fill: =RGBA(0, 120, 212, 1)
+        PaddingLeft: 12
+        PaddingRight: 20
+
+        Children:
+          - Button:
+              Name: btnBack
+              Text: ""
+              Icon: =Icon.BackArrow
+              X: 8
+              Y: 8
+              Width: 40
+              Height: 40
+              Fill: =RGBA(0, 0, 0, 0)
+              Color: =RGBA(255, 255, 255, 1)
+              HoverFill: =RGBA(255, 255, 255, 0.15)
+              BorderStyle: =BorderStyle.None
+              OnSelect: |
+                =// Confirm if form has data
+                If(
+                    !IsBlank(txtTicketTitle.Text) || !IsBlank(txtTicketDescription.Text),
+                    Set(varShowDiscardConfirm, true),
+                    Back()
+                )
+
+          - Label:
+              Name: lblSubmitTitle
+              Text: ="New Ticket"
+              X: 56
+              Y: 0
+              Width: 300
+              Height: =Parent.Height
+              Font: =Font.'Segoe UI'
+              Size: 20
+              FontWeight: =FontWeight.Bold
+              Color: =RGBA(255, 255, 255, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+    # ==========================================================================
+    # FORM CONTAINER — Centered card layout
+    # ==========================================================================
+    - Container:
+        Name: conFormCard
+        X: =Max((Parent.Width - 720) / 2, 20)
+        Y: 80
+        Width: =Min(720, Parent.Width - 40)
+        Height: =Parent.Height - 100
+        Fill: =RGBA(255, 255, 255, 1)
+        RadiusTopLeft: 8
+        RadiusTopRight: 8
+        RadiusBottomLeft: 8
+        RadiusBottomRight: 8
+        DropShadow: =DropShadow.Light
+        PaddingLeft: 32
+        PaddingRight: 32
+        PaddingTop: 28
+        PaddingBottom: 28
+
+        Children:
+          # ---- Section Header ----
+          - Label:
+              Name: lblFormHeader
+              Text: ="Submit a Support Request"
+              X: 0
+              Y: 0
+              Width: =Parent.Width - 64
+              Height: 36
+              Font: =Font.'Segoe UI'
+              Size: 22
+              FontWeight: =FontWeight.Bold
+              Color: =RGBA(50, 49, 48, 1)
+
+          - Label:
+              Name: lblFormSubheader
+              Text: ="Fill in the details below. Fields marked with * are required."
+              X: 0
+              Y: 38
+              Width: =Parent.Width - 64
+              Height: 24
+              Font: =Font.'Segoe UI'
+              Size: 13
+              Color: =RGBA(96, 94, 92, 1)
+
+          # ---- Horizontal line separator ----
+          - Rectangle:
+              Name: recSeparator1
+              X: 0
+              Y: 72
+              Width: =Parent.Width - 64
+              Height: 1
+              Fill: =RGBA(237, 235, 233, 1)
+
+          # ==================================================================
+          # DEPARTMENT DROPDOWN
+          # ==================================================================
+          - Label:
+              Name: lblDepartmentLabel
+              Text: ="Department *"
+              X: 0
+              Y: 88
+              Width: =Parent.Width - 64
+              Height: 24
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(50, 49, 48, 1)
+
+          - Dropdown:
+              Name: ddlDepartment
+              Items: |
+                =Distinct(colCategories, Department)
+              X: 0
+              Y: 114
+              Width: =(Parent.Width - 64 - 16) / 2
+              Height: 40
+              BorderColor: |
+                =If(
+                    varSubmitAttempted && IsBlank(ddlDepartment.Selected.Value),
+                    RGBA(164, 38, 44, 1),
+                    RGBA(210, 208, 206, 1)
+                )
+              FocusBorderColor: =RGBA(0, 120, 212, 1)
+              ChevronBackground: =RGBA(0, 120, 212, 1)
+              Font: =Font.'Segoe UI'
+              Size: 14
+              OnChange: |
+                =Set(varSelectedDepartment, Self.Selected.Value);
+                // Reset category when department changes
+                Set(varSelectedCategory, Blank());
+                Reset(ddlCategory);
+
+          # ==================================================================
+          # CATEGORY DROPDOWN — Cascading, filtered by Department
+          # ==================================================================
+          - Label:
+              Name: lblCategoryLabel
+              Text: ="Category *"
+              X: =(Parent.Width - 64 + 16) / 2
+              Y: 88
+              Width: =(Parent.Width - 64 - 16) / 2
+              Height: 24
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(50, 49, 48, 1)
+
+          - Dropdown:
+              Name: ddlCategory
+              # Cascading filter: only categories for the selected department
+              Items: |
+                =If(
+                    IsBlank(varSelectedDepartment),
+                    // No department selected — show placeholder
+                    ["Select department first"],
+                    // Filter categories to selected department
+                    Filter(
+                        colCategories,
+                        Department = varSelectedDepartment
+                    ).Title
+                )
+              X: =(Parent.Width - 64 + 16) / 2
+              Y: 114
+              Width: =(Parent.Width - 64 - 16) / 2
+              Height: 40
+              DisplayMode: |
+                =If(
+                    IsBlank(varSelectedDepartment),
+                    DisplayMode.Disabled,
+                    DisplayMode.Edit
+                )
+              BorderColor: |
+                =If(
+                    varSubmitAttempted && IsBlank(ddlCategory.Selected.Value),
+                    RGBA(164, 38, 44, 1),
+                    RGBA(210, 208, 206, 1)
+                )
+              FocusBorderColor: =RGBA(0, 120, 212, 1)
+              Font: =Font.'Segoe UI'
+              Size: 14
+              OnChange: =Set(varSelectedCategory, Self.Selected.Value)
+
+          # ==================================================================
+          # PRIORITY SELECTOR — Visual colored buttons
+          # ==================================================================
+          - Label:
+              Name: lblPriorityLabel
+              Text: ="Priority *"
+              X: 0
+              Y: 172
+              Width: =Parent.Width - 64
+              Height: 24
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(50, 49, 48, 1)
+
+          - Container:
+              Name: conPrioritySelector
+              LayoutDirection: Horizontal
+              X: 0
+              Y: 198
+              Width: =Parent.Width - 64
+              Height: 44
+              Gap: 12
+
+              Children:
+                - Button:
+                    Name: btnPriLow
+                    Text: ="Low"
+                    Width: 100
+                    Height: 40
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    BorderStyle: =BorderStyle.Solid
+                    BorderThickness: 2
+                    Fill: |
+                      =If(
+                          varSelectedPriority = "Low",
+                          RGBA(16, 124, 16, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    Color: |
+                      =If(
+                          varSelectedPriority = "Low",
+                          RGBA(255, 255, 255, 1),
+                          RGBA(16, 124, 16, 1)
+                      )
+                    BorderColor: =RGBA(16, 124, 16, 1)
+                    HoverFill: =RGBA(16, 124, 16, 0.12)
+                    OnSelect: =Set(varSelectedPriority, "Low")
+
+                - Button:
+                    Name: btnPriMedium
+                    Text: ="Medium"
+                    Width: 100
+                    Height: 40
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    BorderStyle: =BorderStyle.Solid
+                    BorderThickness: 2
+                    Fill: |
+                      =If(
+                          varSelectedPriority = "Medium",
+                          RGBA(255, 185, 0, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    Color: |
+                      =If(
+                          varSelectedPriority = "Medium",
+                          RGBA(50, 49, 48, 1),
+                          RGBA(202, 80, 16, 1)
+                      )
+                    BorderColor: =RGBA(255, 185, 0, 1)
+                    HoverFill: =RGBA(255, 185, 0, 0.12)
+                    OnSelect: =Set(varSelectedPriority, "Medium")
+
+                - Button:
+                    Name: btnPriHigh
+                    Text: ="High"
+                    Width: 100
+                    Height: 40
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    BorderStyle: =BorderStyle.Solid
+                    BorderThickness: 2
+                    Fill: |
+                      =If(
+                          varSelectedPriority = "High",
+                          RGBA(216, 59, 1, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    Color: |
+                      =If(
+                          varSelectedPriority = "High",
+                          RGBA(255, 255, 255, 1),
+                          RGBA(216, 59, 1, 1)
+                      )
+                    BorderColor: =RGBA(216, 59, 1, 1)
+                    HoverFill: =RGBA(216, 59, 1, 0.12)
+                    OnSelect: =Set(varSelectedPriority, "High")
+
+                - Button:
+                    Name: btnPriCritical
+                    Text: ="Critical"
+                    Width: 100
+                    Height: 40
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    BorderStyle: =BorderStyle.Solid
+                    BorderThickness: 2
+                    Fill: |
+                      =If(
+                          varSelectedPriority = "Critical",
+                          RGBA(164, 38, 44, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    Color: |
+                      =If(
+                          varSelectedPriority = "Critical",
+                          RGBA(255, 255, 255, 1),
+                          RGBA(164, 38, 44, 1)
+                      )
+                    BorderColor: =RGBA(164, 38, 44, 1)
+                    HoverFill: =RGBA(164, 38, 44, 0.12)
+                    OnSelect: =Set(varSelectedPriority, "Critical")
+
+          # ==================================================================
+          # TITLE FIELD
+          # ==================================================================
+          - Label:
+              Name: lblTitleLabel
+              Text: ="Title *"
+              X: 0
+              Y: 260
+              Width: =Parent.Width - 64
+              Height: 24
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(50, 49, 48, 1)
+
+          - TextInput:
+              Name: txtTicketTitle
+              X: 0
+              Y: 286
+              Width: =Parent.Width - 64
+              Height: 40
+              HintText: ="Briefly describe the issue (e.g., 'Cannot access shared drive')"
+              MaxLength: 255
+              Font: =Font.'Segoe UI'
+              Size: 14
+              BorderColor: |
+                =If(
+                    varSubmitAttempted && IsBlank(Self.Text),
+                    RGBA(164, 38, 44, 1),
+                    RGBA(210, 208, 206, 1)
+                )
+              FocusBorderColor: =RGBA(0, 120, 212, 1)
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+
+          - Label:
+              Name: lblTitleCharCount
+              Text: =Len(txtTicketTitle.Text) & "/255"
+              X: =Parent.Width - 64 - 60
+              Y: 328
+              Width: 60
+              Height: 18
+              Font: =Font.'Segoe UI'
+              Size: 10
+              Color: =RGBA(96, 94, 92, 1)
+              Align: =Align.Right
+
+          # ==================================================================
+          # DESCRIPTION FIELD
+          # ==================================================================
+          - Label:
+              Name: lblDescLabel
+              Text: ="Description *"
+              X: 0
+              Y: 350
+              Width: =Parent.Width - 64
+              Height: 24
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(50, 49, 48, 1)
+
+          - TextInput:
+              Name: txtTicketDescription
+              X: 0
+              Y: 376
+              Width: =Parent.Width - 64
+              Height: 120
+              Mode: =TextMode.MultiLine
+              HintText: |
+                ="Provide details about the issue:
+                - What were you trying to do?
+                - What happened instead?
+                - Any error messages?"
+              MaxLength: 5000
+              Font: =Font.'Segoe UI'
+              Size: 14
+              BorderColor: |
+                =If(
+                    varSubmitAttempted && IsBlank(Self.Text),
+                    RGBA(164, 38, 44, 1),
+                    RGBA(210, 208, 206, 1)
+                )
+              FocusBorderColor: =RGBA(0, 120, 212, 1)
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+
+          # ==================================================================
+          # ATTACHMENTS
+          # ==================================================================
+          - Label:
+              Name: lblAttachLabel
+              Text: ="Attachments (optional)"
+              X: 0
+              Y: 510
+              Width: =Parent.Width - 64
+              Height: 24
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(50, 49, 48, 1)
+
+          - Label:
+              Name: lblAttachHint
+              Text: ="Screenshots, log files, or documents (max 10 MB each)"
+              X: 0
+              Y: 534
+              Width: =Parent.Width - 64
+              Height: 20
+              Font: =Font.'Segoe UI'
+              Size: 11
+              Color: =RGBA(96, 94, 92, 1)
+
+          - Attachments:
+              Name: attTicketAttachments
+              X: 0
+              Y: 558
+              Width: =Parent.Width - 64
+              Height: 80
+              MaxAttachments: 5
+              MaxAttachmentSize: 10485760  # 10 MB
+              BorderColor: =RGBA(210, 208, 206, 1)
+              Items: =Blank()
+              DisplayMode: =DisplayMode.Edit
+
+          # ==================================================================
+          # VALIDATION ERROR BANNER
+          # ==================================================================
+          - Container:
+              Name: conValidationError
+              Visible: =varSubmitAttempted && !varFormValid
+              X: 0
+              Y: 650
+              Width: =Parent.Width - 64
+              Height: 40
+              Fill: =RGBA(253, 231, 233, 1)  # Light red background
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+              PaddingLeft: 12
+
+              Children:
+                - Label:
+                    Name: lblValidationMsg
+                    Text: ="Please fill in all required fields before submitting."
+                    Width: =Parent.Width - 24
+                    Height: =Parent.Height
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    Color: =RGBA(164, 38, 44, 1)
+                    VerticalAlign: =VerticalAlign.Middle
+
+          # ==================================================================
+          # SERVER ERROR BANNER
+          # ==================================================================
+          - Container:
+              Name: conServerError
+              Visible: =!IsBlank(varSubmitError)
+              X: 0
+              Y: 650
+              Width: =Parent.Width - 64
+              Height: 40
+              Fill: =RGBA(253, 231, 233, 1)
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+              PaddingLeft: 12
+
+              Children:
+                - Label:
+                    Name: lblServerErrorMsg
+                    Text: =varSubmitError
+                    Width: =Parent.Width - 24
+                    Height: =Parent.Height
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    Color: =RGBA(164, 38, 44, 1)
+                    VerticalAlign: =VerticalAlign.Middle
+
+          # ==================================================================
+          # SUBMIT BUTTON
+          # ==================================================================
+          - Container:
+              Name: conSubmitActions
+              LayoutDirection: Horizontal
+              X: 0
+              Y: 700
+              Width: =Parent.Width - 64
+              Height: 48
+              Gap: 12
+
+              Children:
+                - Button:
+                    Name: btnSubmitTicket
+                    Text: |
+                      =If(
+                          varSubmitting,
+                          "Submitting...",
+                          "Submit Ticket"
+                      )
+                    Width: 180
+                    Height: 44
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Fill: =RGBA(0, 120, 212, 1)
+                    HoverFill: =RGBA(16, 110, 190, 1)
+                    PressedFill: =RGBA(0, 90, 170, 1)
+                    DisabledFill: =RGBA(210, 208, 206, 1)
+                    Color: =RGBA(255, 255, 255, 1)
+                    Font: =Font.'Segoe UI'
+                    Size: 15
+                    FontWeight: =FontWeight.Bold
+                    BorderStyle: =BorderStyle.None
+                    DisplayMode: |
+                      =If(
+                          varSubmitting,
+                          DisplayMode.Disabled,
+                          DisplayMode.Edit
+                      )
+                    OnSelect: |
+                      =// Mark that user has attempted submit (for validation visuals)
+                      Set(varSubmitAttempted, true);
+                      Set(varSubmitError, "");
+
+                      // Validate all required fields
+                      Set(
+                          varFormValid,
+                          !IsBlank(varSelectedDepartment)
+                          && !IsBlank(varSelectedCategory)
+                          && !IsBlank(Trim(txtTicketTitle.Text))
+                          && !IsBlank(Trim(txtTicketDescription.Text))
+                          && !IsBlank(varSelectedPriority)
+                      );
+
+                      If(
+                          varFormValid,
+                          // Begin submission
+                          Set(varSubmitting, true);
+
+                          // Generate ticket ID: SD-YYYYMMDD-XXXX
+                          Set(
+                              varNewTicketID,
+                              "SD-" & Text(Today(), "yyyymmdd") & "-" &
+                              Text(
+                                  CountRows(
+                                      Filter(
+                                          ServiceDeskTickets,
+                                          Created >= DateValue(Text(Today(), "yyyy-mm-dd"))
+                                      )
+                                  ) + 1,
+                                  "0000"
+                              )
+                          );
+
+                          // Calculate SLA Due Date based on priority
+                          Set(
+                              varSLADue,
+                              Switch(
+                                  varSelectedPriority,
+                                  "Critical", DateAdd(Now(), 4, TimeUnit.Hours),
+                                  "High",     DateAdd(Now(), 8, TimeUnit.Hours),
+                                  "Medium",   DateAdd(Now(), 24, TimeUnit.Hours),
+                                  "Low",      DateAdd(Now(), 72, TimeUnit.Hours),
+                                  DateAdd(Now(), 24, TimeUnit.Hours)
+                              )
+                          );
+
+                          // Patch to SharePoint
+                          Set(
+                              varNewRecord,
+                              Patch(
+                                  ServiceDeskTickets,
+                                  Defaults(ServiceDeskTickets),
+                                  {
+                                      TicketID:    varNewTicketID,
+                                      Title:       Trim(txtTicketTitle.Text),
+                                      Description: Trim(txtTicketDescription.Text),
+                                      Department:  varSelectedDepartment,
+                                      Category:    varSelectedCategory,
+                                      Priority:    varSelectedPriority,
+                                      Status:      "New",
+                                      SLADueDate:  varSLADue,
+                                      CreatedBy:   {
+                                          '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                          Claims: "i:0#.f|membership|" & Lower(User().Email),
+                                          DisplayName: User().FullName,
+                                          Email: User().Email
+                                      }
+                                  }
+                              )
+                          );
+
+                          // Check for errors
+                          If(
+                              IsError(varNewRecord),
+                              Set(varSubmitError, "Failed to create ticket. Please try again.");
+                              Set(varSubmitting, false),
+
+                              // Success: Upload attachments if any
+                              If(
+                                  CountRows(attTicketAttachments.Attachments) > 0,
+                                  ForAll(
+                                      attTicketAttachments.Attachments,
+                                      Patch(
+                                          ServiceDeskTickets,
+                                          varNewRecord,
+                                          {
+                                              Attachments: {
+                                                  Value: ThisRecord
+                                              }
+                                          }
+                                      )
+                                  )
+                              );
+
+                              // Trigger Power Automate flow for notifications
+                              ServiceDeskNewTicketFlow.Run(
+                                  varNewRecord.ID,
+                                  varNewTicketID,
+                                  Trim(txtTicketTitle.Text),
+                                  varSelectedDepartment,
+                                  varSelectedCategory,
+                                  varSelectedPriority,
+                                  User().Email,
+                                  User().FullName
+                              );
+
+                              Set(varSubmitting, false);
+                              Set(varSubmitSuccess, true);
+
+                              // Show success notification, then navigate
+                              Notify(
+                                  "Ticket " & varNewTicketID & " created successfully!",
+                                  NotificationType.Success,
+                                  3000
+                              );
+
+                              // Navigate to the new ticket's detail screen
+                              Set(varSelectedTicketID, varNewRecord.ID);
+                              Navigate(scrTicketDetail, ScreenTransition.Fade)
+                          )
+                      )
+
+                - Button:
+                    Name: btnCancel
+                    Text: ="Cancel"
+                    Width: 120
+                    Height: 44
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    Fill: =RGBA(0, 0, 0, 0)
+                    Color: =RGBA(96, 94, 92, 1)
+                    HoverFill: =RGBA(0, 0, 0, 0.05)
+                    BorderStyle: =BorderStyle.Solid
+                    BorderColor: =RGBA(210, 208, 206, 1)
+                    BorderThickness: 1
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+                    FontWeight: =FontWeight.Semibold
+                    DisplayMode: |
+                      =If(
+                          varSubmitting,
+                          DisplayMode.Disabled,
+                          DisplayMode.Edit
+                      )
+                    OnSelect: =Back()
+
+    # ==========================================================================
+    # DISCARD CONFIRMATION DIALOG
+    # ==========================================================================
+    - Container:
+        Name: conDiscardOverlay
+        Visible: =varShowDiscardConfirm
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: =Parent.Height
+        Fill: =RGBA(0, 0, 0, 0.4)
+
+        Children:
+          - Container:
+              Name: conDiscardDialog
+              X: =(Parent.Width - 400) / 2
+              Y: =(Parent.Height - 200) / 2
+              Width: 400
+              Height: 200
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 8
+              RadiusTopRight: 8
+              RadiusBottomLeft: 8
+              RadiusBottomRight: 8
+              DropShadow: =DropShadow.Bold
+              PaddingLeft: 24
+              PaddingRight: 24
+              PaddingTop: 24
+              PaddingBottom: 24
+
+              Children:
+                - Label:
+                    Name: lblDiscardTitle
+                    Text: ="Discard changes?"
+                    X: 0
+                    Y: 0
+                    Width: 352
+                    Height: 32
+                    Font: =Font.'Segoe UI'
+                    Size: 18
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                - Label:
+                    Name: lblDiscardBody
+                    Text: ="You have unsaved changes. Are you sure you want to leave?"
+                    X: 0
+                    Y: 40
+                    Width: 352
+                    Height: 48
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+                    Color: =RGBA(96, 94, 92, 1)
+
+                - Container:
+                    Name: conDiscardActions
+                    LayoutDirection: Horizontal
+                    X: 0
+                    Y: 120
+                    Width: 352
+                    Height: 40
+                    Gap: 12
+
+                    Children:
+                      - Button:
+                          Name: btnDiscardConfirm
+                          Text: ="Discard"
+                          Width: 120
+                          Height: 36
+                          Fill: =RGBA(216, 59, 1, 1)
+                          Color: =RGBA(255, 255, 255, 1)
+                          HoverFill: =RGBA(164, 38, 44, 1)
+                          BorderStyle: =BorderStyle.None
+                          RadiusTopLeft: 4
+                          RadiusTopRight: 4
+                          RadiusBottomLeft: 4
+                          RadiusBottomRight: 4
+                          Font: =Font.'Segoe UI'
+                          Size: 14
+                          FontWeight: =FontWeight.Semibold
+                          OnSelect: |
+                            =Set(varShowDiscardConfirm, false);
+                            Back()
+
+                      - Button:
+                          Name: btnDiscardCancel
+                          Text: ="Keep editing"
+                          Width: 120
+                          Height: 36
+                          Fill: =RGBA(0, 0, 0, 0)
+                          Color: =RGBA(50, 49, 48, 1)
+                          HoverFill: =RGBA(0, 0, 0, 0.05)
+                          BorderStyle: =BorderStyle.Solid
+                          BorderColor: =RGBA(210, 208, 206, 1)
+                          RadiusTopLeft: 4
+                          RadiusTopRight: 4
+                          RadiusBottomLeft: 4
+                          RadiusBottomRight: 4
+                          Font: =Font.'Segoe UI'
+                          Size: 14
+                          FontWeight: =FontWeight.Semibold
+                          OnSelect: =Set(varShowDiscardConfirm, false)
+
+    # ==========================================================================
+    # SUCCESS OVERLAY (brief flash before navigation)
+    # ==========================================================================
+    - Container:
+        Name: conSuccessOverlay
+        Visible: =varSubmitSuccess
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: =Parent.Height
+        Fill: =RGBA(250, 249, 248, 0.95)
+
+        Children:
+          - Container:
+              Name: conSuccessCard
+              X: =(Parent.Width - 360) / 2
+              Y: =(Parent.Height - 180) / 2
+              Width: 360
+              Height: 180
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 12
+              RadiusTopRight: 12
+              RadiusBottomLeft: 12
+              RadiusBottomRight: 12
+              DropShadow: =DropShadow.Bold
+
+              Children:
+                - Label:
+                    Name: lblSuccessIcon
+                    Text: ="✓"
+                    X: 140
+                    Y: 24
+                    Width: 80
+                    Height: 60
+                    Font: =Font.'Segoe UI'
+                    Size: 40
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(16, 124, 16, 1)
+                    Align: =Align.Center
+                    VerticalAlign: =VerticalAlign.Middle
+
+                - Label:
+                    Name: lblSuccessText
+                    Text: ="Ticket Created!"
+                    X: 40
+                    Y: 90
+                    Width: 280
+                    Height: 30
+                    Font: =Font.'Segoe UI'
+                    Size: 18
+                    FontWeight: =FontWeight.Bold
+                    Color: =RGBA(50, 49, 48, 1)
+                    Align: =Align.Center
+
+                - Label:
+                    Name: lblSuccessTicketID
+                    Text: =varNewTicketID
+                    X: 40
+                    Y: 122
+                    Width: 280
+                    Height: 24
+                    Font: =Font.'Courier New'
+                    Size: 14
+                    Color: =RGBA(96, 94, 92, 1)
+                    Align: =Align.Center

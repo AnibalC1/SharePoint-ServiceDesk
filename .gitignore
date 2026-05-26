@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Node (if SPFx development added later)
+node_modules/
+dist/
+lib/
+temp/
+*.log
+
+# PowerShell
+*.ps1xml
+
+# Power BI
+*.pbix
+
+# Sensitive
+*.env
+credentials.json

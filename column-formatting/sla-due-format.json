@@ -1,0 +1,105 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "elmType": "div",
+  "style": {
+    "display": "flex",
+    "align-items": "center",
+    "justify-content": "center"
+  },
+  "children": [
+    {
+      "elmType": "span",
+      "style": {
+        "display": "=if(@currentField == '', 'none', 'inline-flex')",
+        "align-items": "center",
+        "gap": "6px",
+        "padding": "4px 14px",
+        "border-radius": "16px",
+        "font-size": "12px",
+        "font-weight": "600",
+        "white-space": "nowrap",
+        "cursor": "default",
+        "transition": "opacity 0.2s ease",
+        "color": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, '#605E5C', if(Number(@currentField) < Number(@now), '#ffffff', if(Number(@currentField) - Number(@now) <= 14400000, '#ffffff', if(Number(@currentField) - Number(@now) <= 86400000, '#323130', '#107C10'))))",
+        "background-color": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, '#F3F2F1', if(Number(@currentField) < Number(@now), '#A4262C', if(Number(@currentField) - Number(@now) <= 14400000, '#D83B01', if(Number(@currentField) - Number(@now) <= 86400000, '#FFB900', '#E6F2E6'))))",
+        "box-shadow": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, 'none', if(Number(@currentField) < Number(@now), '0 1px 4px rgba(164,38,44,0.3)', if(Number(@currentField) - Number(@now) <= 14400000, '0 1px 4px rgba(216,59,1,0.3)', if(Number(@currentField) - Number(@now) <= 86400000, '0 1px 4px rgba(255,185,0,0.3)', 'none'))))",
+        "border": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, '1px solid #E1DFDD', 'none')"
+      },
+      "children": [
+        {
+          "elmType": "span",
+          "attributes": {
+            "iconName": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, 'SkypeCheck', if(Number(@currentField) < Number(@now), 'AlertSolid', if(Number(@currentField) - Number(@now) <= 14400000, 'Clock', if(Number(@currentField) - Number(@now) <= 86400000, 'Clock', 'Clock'))))"
+          },
+          "style": {
+            "font-size": "12px"
+          }
+        },
+        {
+          "elmType": "span",
+          "txtContent": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, toLocaleDateString(@currentField), if(Number(@currentField) < Number(@now), 'OVERDUE', if(Number(@currentField) - Number(@now) <= 14400000, toLocaleDateString(@currentField) + ' ' + toLocaleTimeString(@currentField), if(Number(@currentField) - Number(@now) <= 86400000, toLocaleDateString(@currentField) + ' ' + toLocaleTimeString(@currentField), toLocaleDateString(@currentField)))))",
+          "style": {
+            "line-height": "1"
+          }
+        }
+      ]
+    },
+    {
+      "elmType": "span",
+      "style": {
+        "display": "=if(@currentField == '', 'inline', 'none')",
+        "color": "#A19F9D",
+        "font-size": "12px",
+        "font-style": "italic"
+      },
+      "txtContent": "No SLA set"
+    }
+  ],
+  "customCardProps": {
+    "openOnEvent": "hover",
+    "directionalHint": "bottomCenter",
+    "isBeakVisible": true,
+    "formatter": {
+      "elmType": "div",
+      "style": {
+        "padding": "16px",
+        "min-width": "220px"
+      },
+      "children": [
+        {
+          "elmType": "div",
+          "style": {
+            "font-size": "11px",
+            "font-weight": "600",
+            "text-transform": "uppercase",
+            "letter-spacing": "1px",
+            "color": "#605E5C",
+            "margin-bottom": "10px"
+          },
+          "txtContent": "SLA Due Date"
+        },
+        {
+          "elmType": "div",
+          "style": {
+            "font-size": "16px",
+            "font-weight": "700",
+            "margin-bottom": "4px",
+            "color": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, '#107C10', if(Number(@currentField) < Number(@now), '#A4262C', if(Number(@currentField) - Number(@now) <= 14400000, '#D83B01', if(Number(@currentField) - Number(@now) <= 86400000, '#CA5010', '#323130'))))"
+          },
+          "txtContent": "=if(@currentField == '', 'Not set', toLocaleDateString(@currentField) + ' ' + toLocaleTimeString(@currentField))"
+        },
+        {
+          "elmType": "div",
+          "style": {
+            "font-size": "12px",
+            "color": "#605E5C",
+            "margin-top": "6px",
+            "padding-top": "8px",
+            "border-top": "1px solid #EDEBE9"
+          },
+          "txtContent": "=if(if([$Status] == 'Resolved', 1, if([$Status] == 'Closed', 1, 0)) == 1, 'Ticket is ' + [$Status], if(@currentField == '', '', if(Number(@currentField) < Number(@now), 'This ticket is past its SLA deadline', if(Number(@currentField) - Number(@now) <= 14400000, 'Due within 4 hours', if(Number(@currentField) - Number(@now) <= 86400000, 'Due within 24 hours', 'On track')))))"
+        }
+      ]
+    }
+  }
+}

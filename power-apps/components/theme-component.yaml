@@ -1,0 +1,648 @@
+# ==============================================================================
+# Service Desk - Theme Component Library
+# Power Apps Component Library (YAML Code-First Format)
+# ==============================================================================
+# Contains brand color constants, typography scale, and reusable components:
+#   - StatusPill
+#   - PriorityPill
+#   - KPICard
+#   - TicketRow
+# ==============================================================================
+
+ComponentLibrary:
+  Name: ServiceDeskThemeLib
+  Description: "Shared design system for the Service Desk Canvas App"
+
+  # ============================================================================
+  # COLOR CONSTANTS
+  # ============================================================================
+  # Access via: ServiceDeskThemeLib.Colors.Primary, etc.
+  # These are defined as custom properties on the library root.
+  # ============================================================================
+  CustomProperties:
+
+    # --- Brand Palette ---
+    Colors:
+      Type: Record
+      Default: |
+        ={
+            Primary:        "#0078D4",
+            PrimaryRGBA:    RGBA(0, 120, 212, 1),
+            Secondary:      "#106EBE",
+            SecondaryRGBA:  RGBA(16, 110, 190, 1),
+            Accent:         "#038387",
+            AccentRGBA:     RGBA(3, 131, 135, 1),
+
+            Success:        "#107C10",
+            SuccessRGBA:    RGBA(16, 124, 16, 1),
+            Warning:        "#FFB900",
+            WarningRGBA:    RGBA(255, 185, 0, 1),
+            Danger:         "#D83B01",
+            DangerRGBA:     RGBA(216, 59, 1, 1),
+            Critical:       "#A4262C",
+            CriticalRGBA:   RGBA(164, 38, 44, 1),
+
+            Background:     "#FAF9F8",
+            BackgroundRGBA: RGBA(250, 249, 248, 1),
+            Surface:        "#FFFFFF",
+            SurfaceRGBA:    RGBA(255, 255, 255, 1),
+
+            Text:           "#323130",
+            TextRGBA:       RGBA(50, 49, 48, 1),
+            TextSecondary:  "#605E5C",
+            TextSecondaryRGBA: RGBA(96, 94, 92, 1),
+
+            Border:         "#D2D0CE",
+            BorderRGBA:     RGBA(210, 208, 206, 1),
+            Divider:        "#EDEBE9",
+            DividerRGBA:    RGBA(237, 235, 233, 1),
+
+            Transparent:    RGBA(0, 0, 0, 0)
+        }
+
+    # --- Status Color Map ---
+    StatusColors:
+      Type: Record
+      Default: |
+        ={
+            New:                RGBA(0, 120, 212, 1),
+            Assigned:           RGBA(3, 131, 135, 1),
+            InProgress:         RGBA(202, 80, 16, 1),
+            PendingRequester:   RGBA(255, 185, 0, 1),
+            Resolved:           RGBA(16, 124, 16, 1),
+            Closed:             RGBA(96, 94, 92, 1)
+        }
+
+    # --- Priority Color Map ---
+    PriorityColors:
+      Type: Record
+      Default: |
+        ={
+            Critical:   RGBA(164, 38, 44, 1),
+            High:       RGBA(216, 59, 1, 1),
+            Medium:     RGBA(255, 185, 0, 1),
+            Low:        RGBA(16, 124, 16, 1)
+        }
+
+  # ============================================================================
+  # TYPOGRAPHY SCALE
+  # ============================================================================
+  # Consistent type ramp following Fluent UI guidelines.
+  # Usage: Set control properties to match these values.
+  # ============================================================================
+  #
+  #   Scale          Size   Weight          Line Height   Use Case
+  #   -------------- ------ --------------- ------------- -----------------------
+  #   HeroTitle      28     Bold            36            Dashboard headers
+  #   Heading        22     Bold            30            Section titles
+  #   Subheading     18     Semibold        24            Card titles
+  #   BodyLarge      15     Semibold        22            Emphasized body
+  #   Body           14     Normal          20            Default body text
+  #   BodySmall      13     Normal          18            Secondary info
+  #   Caption        12     Normal          16            Labels, metadata
+  #   CaptionSmall   11     Normal          16            Timestamps, hints
+  #   Overline       10     Semibold (caps) 14            Section overlines
+  #   Monospace      12     Semibold        16            Ticket IDs (Courier New)
+  #
+  # ============================================================================
+
+  Typography:
+    Type: Record
+    Default: |
+      ={
+          HeroTitle:    { Size: 28, Weight: FontWeight.Bold,     Font: Font.'Segoe UI' },
+          Heading:      { Size: 22, Weight: FontWeight.Bold,     Font: Font.'Segoe UI' },
+          Subheading:   { Size: 18, Weight: FontWeight.Semibold, Font: Font.'Segoe UI' },
+          BodyLarge:    { Size: 15, Weight: FontWeight.Semibold, Font: Font.'Segoe UI' },
+          Body:         { Size: 14, Weight: FontWeight.Normal,   Font: Font.'Segoe UI' },
+          BodySmall:    { Size: 13, Weight: FontWeight.Normal,   Font: Font.'Segoe UI' },
+          Caption:      { Size: 12, Weight: FontWeight.Normal,   Font: Font.'Segoe UI' },
+          CaptionSmall: { Size: 11, Weight: FontWeight.Normal,   Font: Font.'Segoe UI' },
+          Overline:     { Size: 10, Weight: FontWeight.Semibold, Font: Font.'Segoe UI' },
+          Monospace:    { Size: 12, Weight: FontWeight.Semibold, Font: Font.'Courier New' }
+      }
+
+  # ============================================================================
+  # COMPONENT: StatusPill
+  # ============================================================================
+  # Renders a colored pill badge for ticket status values.
+  #
+  # Input Properties:
+  #   - Status (Text): one of "New", "Assigned", "In Progress",
+  #                     "Pending Requester", "Resolved", "Closed"
+  #   - PillWidth (Number): optional override width (default 120)
+  #   - PillHeight (Number): optional override height (default 28)
+  # ============================================================================
+  Components:
+
+    - Component:
+        Name: cmpStatusPill
+        Description: "Colored pill badge displaying ticket status"
+        Width: 120
+        Height: 28
+
+        CustomProperties:
+          Status:
+            Type: Text
+            Default: ="New"
+          PillWidth:
+            Type: Number
+            Default: =120
+          PillHeight:
+            Type: Number
+            Default: =28
+
+        Children:
+          - Button:
+              Name: btnStatusPillInner
+              Text: =cmpStatusPill.Status
+              X: 0
+              Y: 0
+              Width: =cmpStatusPill.PillWidth
+              Height: =cmpStatusPill.PillHeight
+              RadiusTopLeft: =cmpStatusPill.PillHeight / 2
+              RadiusTopRight: =cmpStatusPill.PillHeight / 2
+              RadiusBottomLeft: =cmpStatusPill.PillHeight / 2
+              RadiusBottomRight: =cmpStatusPill.PillHeight / 2
+              Font: =Font.'Segoe UI'
+              Size: 11
+              FontWeight: =FontWeight.Semibold
+              DisplayMode: =DisplayMode.Disabled
+              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+              BorderStyle: =BorderStyle.None
+              DisabledColor: |
+                =// Dark text only on "Pending Requester" (amber background)
+                If(
+                    cmpStatusPill.Status = "Pending Requester",
+                    RGBA(50, 49, 48, 1),
+                    RGBA(255, 255, 255, 1)
+                )
+              DisabledFill: |
+                =Switch(
+                    cmpStatusPill.Status,
+                    "New",                RGBA(0, 120, 212, 1),    // Primary blue
+                    "Assigned",           RGBA(3, 131, 135, 1),    // Accent teal
+                    "In Progress",        RGBA(202, 80, 16, 1),    // Orange
+                    "Pending Requester",  RGBA(255, 185, 0, 1),    // Warning amber
+                    "Resolved",           RGBA(16, 124, 16, 1),    // Success green
+                    "Closed",             RGBA(96, 94, 92, 1),     // Neutral grey
+                    RGBA(210, 208, 206, 1)                         // Fallback
+                )
+
+    # ==========================================================================
+    # COMPONENT: PriorityPill
+    # ==========================================================================
+    # Renders a colored pill badge for priority levels.
+    #
+    # Input Properties:
+    #   - Priority (Text): one of "Critical", "High", "Medium", "Low"
+    #   - PillWidth (Number): optional override width (default 80)
+    #   - PillHeight (Number): optional override height (default 28)
+    # ==========================================================================
+    - Component:
+        Name: cmpPriorityPill
+        Description: "Colored pill badge displaying ticket priority"
+        Width: 80
+        Height: 28
+
+        CustomProperties:
+          Priority:
+            Type: Text
+            Default: ="Medium"
+          PillWidth:
+            Type: Number
+            Default: =80
+          PillHeight:
+            Type: Number
+            Default: =28
+
+        Children:
+          - Button:
+              Name: btnPriorityPillInner
+              Text: =cmpPriorityPill.Priority
+              X: 0
+              Y: 0
+              Width: =cmpPriorityPill.PillWidth
+              Height: =cmpPriorityPill.PillHeight
+              RadiusTopLeft: =cmpPriorityPill.PillHeight / 2
+              RadiusTopRight: =cmpPriorityPill.PillHeight / 2
+              RadiusBottomLeft: =cmpPriorityPill.PillHeight / 2
+              RadiusBottomRight: =cmpPriorityPill.PillHeight / 2
+              Font: =Font.'Segoe UI'
+              Size: 11
+              FontWeight: =FontWeight.Semibold
+              DisplayMode: =DisplayMode.Disabled
+              DisabledBorderColor: =RGBA(0, 0, 0, 0)
+              BorderStyle: =BorderStyle.None
+              DisabledColor: |
+                =// "Medium" uses dark text on amber; others use white
+                If(
+                    cmpPriorityPill.Priority = "Medium",
+                    RGBA(50, 49, 48, 1),
+                    RGBA(255, 255, 255, 1)
+                )
+              DisabledFill: |
+                =Switch(
+                    cmpPriorityPill.Priority,
+                    "Critical", RGBA(164, 38, 44, 1),  // #A4262C
+                    "High",     RGBA(216, 59, 1, 1),   // #D83B01
+                    "Medium",   RGBA(255, 185, 0, 1),  // #FFB900
+                    "Low",      RGBA(16, 124, 16, 1),  // #107C10
+                    RGBA(210, 208, 206, 1)
+                )
+
+    # ==========================================================================
+    # COMPONENT: KPICard
+    # ==========================================================================
+    # Reusable KPI metric card with label, value, sub-text, and accent color.
+    #
+    # Input Properties:
+    #   - Label (Text): e.g., "Open Tickets"
+    #   - Value (Text): e.g., "42" or "3.2d"
+    #   - Subtext (Text): e.g., "active requests"
+    #   - AccentColor (Color): color for the value text
+    #   - IsLoading (Boolean): shows placeholder when true
+    #   - CardWidth (Number): default 280
+    #   - CardHeight (Number): default 110
+    # ==========================================================================
+    - Component:
+        Name: cmpKPICard
+        Description: "Dashboard KPI metric card"
+        Width: 280
+        Height: 110
+
+        CustomProperties:
+          Label:
+            Type: Text
+            Default: ="Metric"
+          Value:
+            Type: Text
+            Default: ="0"
+          Subtext:
+            Type: Text
+            Default: =""
+          AccentColor:
+            Type: Color
+            Default: =RGBA(0, 120, 212, 1)
+          IsLoading:
+            Type: Boolean
+            Default: =false
+          CardWidth:
+            Type: Number
+            Default: =280
+          CardHeight:
+            Type: Number
+            Default: =110
+
+        Children:
+          - Container:
+              Name: conKPICardOuter
+              X: 0
+              Y: 0
+              Width: =cmpKPICard.CardWidth
+              Height: =cmpKPICard.CardHeight
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 8
+              RadiusTopRight: 8
+              RadiusBottomLeft: 8
+              RadiusBottomRight: 8
+              DropShadow: =DropShadow.Light
+              PaddingLeft: 20
+              PaddingTop: 16
+              PaddingRight: 20
+              PaddingBottom: 16
+
+              Children:
+                # Accent top border stripe
+                - Rectangle:
+                    Name: recKPIAccent
+                    X: 0
+                    Y: 0
+                    Width: =Parent.Width
+                    Height: 3
+                    Fill: =cmpKPICard.AccentColor
+                    RadiusTopLeft: 8
+                    RadiusTopRight: 8
+
+                # Label
+                - Label:
+                    Name: lblKPILabel
+                    Text: =cmpKPICard.Label
+                    X: 0
+                    Y: 12
+                    Width: =Parent.Width - 40
+                    Height: 24
+                    Font: =Font.'Segoe UI'
+                    Size: 12
+                    FontWeight: =FontWeight.Semibold
+                    Color: =RGBA(96, 94, 92, 1)
+
+                # Value
+                - Label:
+                    Name: lblKPIValue
+                    Text: |
+                      =If(
+                          cmpKPICard.IsLoading,
+                          "...",
+                          cmpKPICard.Value
+                      )
+                    X: 0
+                    Y: 36
+                    Width: =Parent.Width - 40
+                    Height: 44
+                    Font: =Font.'Segoe UI'
+                    Size: 32
+                    FontWeight: =FontWeight.Bold
+                    Color: =cmpKPICard.AccentColor
+
+                # Subtext
+                - Label:
+                    Name: lblKPISubtext
+                    Text: =cmpKPICard.Subtext
+                    X: 0
+                    Y: 80
+                    Width: =Parent.Width - 40
+                    Height: 18
+                    Font: =Font.'Segoe UI'
+                    Size: 10
+                    Color: =RGBA(96, 94, 92, 1)
+
+    # ==========================================================================
+    # COMPONENT: TicketRow
+    # ==========================================================================
+    # Reusable ticket row card for use in galleries.
+    #
+    # Input Properties:
+    #   - TicketID (Text): e.g., "SD-20260526-0001"
+    #   - Title (Text)
+    #   - Status (Text)
+    #   - Priority (Text)
+    #   - DepartmentCategory (Text): e.g., "IT / Network"
+    #   - AssigneeName (Text)
+    #   - AssigneeImage (Image)
+    #   - SLADueDate (DateTime)
+    #   - IsClosed (Boolean)
+    #   - RowWidth (Number): default from parent
+    #
+    # Output Properties:
+    #   - OnRowSelect (Behavior): fires when the row is tapped
+    # ==========================================================================
+    - Component:
+        Name: cmpTicketRow
+        Description: "Ticket list row card with status pill, priority pill, and SLA indicator"
+        Width: 800
+        Height: 68
+
+        CustomProperties:
+          TicketID:
+            Type: Text
+            Default: ="SD-00000000-0000"
+          Title:
+            Type: Text
+            Default: ="Untitled ticket"
+          Status:
+            Type: Text
+            Default: ="New"
+          Priority:
+            Type: Text
+            Default: ="Medium"
+          DepartmentCategory:
+            Type: Text
+            Default: =""
+          AssigneeName:
+            Type: Text
+            Default: =""
+          AssigneeImage:
+            Type: Image
+            Default: =Blank()
+          SLADueDate:
+            Type: DateTime
+            Default: =Blank()
+          IsClosed:
+            Type: Boolean
+            Default: =false
+          RowWidth:
+            Type: Number
+            Default: =800
+          OnRowSelect:
+            Type: Behavior
+            Default: =false
+
+        Children:
+          - Container:
+              Name: conTicketRowOuter
+              X: 0
+              Y: 0
+              Width: =cmpTicketRow.RowWidth
+              Height: 64
+              Fill: =RGBA(255, 255, 255, 1)
+              RadiusTopLeft: 6
+              RadiusTopRight: 6
+              RadiusBottomLeft: 6
+              RadiusBottomRight: 6
+              DropShadow: =DropShadow.Light
+              PaddingLeft: 16
+              PaddingRight: 16
+
+              Children:
+                # Ticket ID — monospace
+                - Label:
+                    Name: lblRowTicketID
+                    Text: =cmpTicketRow.TicketID
+                    X: 0
+                    Y: 12
+                    Width: 140
+                    Height: 20
+                    Font: =Font.'Courier New'
+                    Size: 12
+                    FontWeight: =FontWeight.Semibold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                # Title
+                - Label:
+                    Name: lblRowTitle
+                    Text: =cmpTicketRow.Title
+                    X: 150
+                    Y: 6
+                    Width: =Parent.Width - 150 - 440
+                    Height: 24
+                    Font: =Font.'Segoe UI'
+                    Size: 14
+                    FontWeight: =FontWeight.Semibold
+                    Color: =RGBA(50, 49, 48, 1)
+                    Overflow: =Overflow.Hidden
+
+                # Department / Category
+                - Label:
+                    Name: lblRowDeptCat
+                    Text: =cmpTicketRow.DepartmentCategory
+                    X: 150
+                    Y: 32
+                    Width: =Parent.Width - 150 - 440
+                    Height: 20
+                    Font: =Font.'Segoe UI'
+                    Size: 11
+                    Color: =RGBA(96, 94, 92, 1)
+
+                # Status Pill (inline)
+                - Button:
+                    Name: btnRowStatusPill
+                    Text: =cmpTicketRow.Status
+                    X: =Parent.Width - 420
+                    Y: 16
+                    Width: 120
+                    Height: 28
+                    RadiusTopLeft: 14
+                    RadiusTopRight: 14
+                    RadiusBottomLeft: 14
+                    RadiusBottomRight: 14
+                    Size: 11
+                    FontWeight: =FontWeight.Semibold
+                    DisplayMode: =DisplayMode.Disabled
+                    DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                    BorderStyle: =BorderStyle.None
+                    DisabledColor: |
+                      =If(
+                          cmpTicketRow.Status = "Pending Requester",
+                          RGBA(50, 49, 48, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    DisabledFill: |
+                      =Switch(
+                          cmpTicketRow.Status,
+                          "New",                RGBA(0, 120, 212, 1),
+                          "Assigned",           RGBA(3, 131, 135, 1),
+                          "In Progress",        RGBA(202, 80, 16, 1),
+                          "Pending Requester",  RGBA(255, 185, 0, 1),
+                          "Resolved",           RGBA(16, 124, 16, 1),
+                          "Closed",             RGBA(96, 94, 92, 1),
+                          RGBA(210, 208, 206, 1)
+                      )
+
+                # Priority Pill (inline)
+                - Button:
+                    Name: btnRowPriorityPill
+                    Text: =cmpTicketRow.Priority
+                    X: =Parent.Width - 290
+                    Y: 16
+                    Width: 80
+                    Height: 28
+                    RadiusTopLeft: 14
+                    RadiusTopRight: 14
+                    RadiusBottomLeft: 14
+                    RadiusBottomRight: 14
+                    Size: 11
+                    FontWeight: =FontWeight.Semibold
+                    DisplayMode: =DisplayMode.Disabled
+                    DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                    BorderStyle: =BorderStyle.None
+                    DisabledColor: |
+                      =If(
+                          cmpTicketRow.Priority = "Medium",
+                          RGBA(50, 49, 48, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    DisabledFill: |
+                      =Switch(
+                          cmpTicketRow.Priority,
+                          "Critical", RGBA(164, 38, 44, 1),
+                          "High",     RGBA(216, 59, 1, 1),
+                          "Medium",   RGBA(255, 185, 0, 1),
+                          "Low",      RGBA(16, 124, 16, 1),
+                          RGBA(210, 208, 206, 1)
+                      )
+
+                # Assignee avatar + name
+                - Image:
+                    Name: imgRowAvatar
+                    Image: =cmpTicketRow.AssigneeImage
+                    X: =Parent.Width - 196
+                    Y: 14
+                    Width: 32
+                    Height: 32
+                    ImagePosition: =ImagePosition.Fill
+                    RadiusTopLeft: 16
+                    RadiusTopRight: 16
+                    RadiusBottomLeft: 16
+                    RadiusBottomRight: 16
+                    Visible: =!IsBlank(cmpTicketRow.AssigneeName)
+
+                - Label:
+                    Name: lblRowAssignee
+                    Text: |
+                      =If(
+                          IsBlank(cmpTicketRow.AssigneeName),
+                          "Unassigned",
+                          cmpTicketRow.AssigneeName
+                      )
+                    X: =Parent.Width - 160
+                    Y: 16
+                    Width: 80
+                    Height: 28
+                    Font: =Font.'Segoe UI'
+                    Size: 11
+                    Color: |
+                      =If(
+                          IsBlank(cmpTicketRow.AssigneeName),
+                          RGBA(164, 38, 44, 1),
+                          RGBA(50, 49, 48, 1)
+                      )
+                    VerticalAlign: =VerticalAlign.Middle
+
+                # SLA Due
+                - Label:
+                    Name: lblRowSLA
+                    Text: |
+                      =If(
+                          IsBlank(cmpTicketRow.SLADueDate),
+                          "--",
+                          If(
+                              cmpTicketRow.IsClosed,
+                              Text(cmpTicketRow.SLADueDate, "MMM dd"),
+                              With(
+                                  { hoursLeft: DateDiff(Now(), cmpTicketRow.SLADueDate, TimeUnit.Hours) },
+                                  If(
+                                      hoursLeft < 0,   "OVERDUE",
+                                      hoursLeft < 4,   Text(hoursLeft) & "h left",
+                                      hoursLeft < 24,  Text(hoursLeft) & "h",
+                                      Text(cmpTicketRow.SLADueDate, "MMM dd")
+                                  )
+                              )
+                          )
+                      )
+                    X: =Parent.Width - 72
+                    Y: 16
+                    Width: 68
+                    Height: 28
+                    Font: =Font.'Segoe UI'
+                    Size: 11
+                    FontWeight: =FontWeight.Semibold
+                    Align: =Align.Right
+                    VerticalAlign: =VerticalAlign.Middle
+                    Color: |
+                      =If(
+                          cmpTicketRow.IsClosed,
+                          RGBA(96, 94, 92, 1),
+                          With(
+                              { hoursLeft: DateDiff(Now(), cmpTicketRow.SLADueDate, TimeUnit.Hours) },
+                              If(
+                                  hoursLeft < 0,   RGBA(164, 38, 44, 1),
+                                  hoursLeft < 4,   RGBA(216, 59, 1, 1),
+                                  hoursLeft < 24,  RGBA(255, 185, 0, 1),
+                                  RGBA(96, 94, 92, 1)
+                              )
+                          )
+                      )
+
+                # Transparent hit target button
+                - Button:
+                    Name: btnRowHitTarget
+                    Text: ""
+                    X: 0
+                    Y: 0
+                    Width: =Parent.Width
+                    Height: =Parent.Height
+                    Fill: =RGBA(0, 0, 0, 0)
+                    HoverFill: =RGBA(0, 120, 212, 0.04)
+                    BorderStyle: =BorderStyle.None
+                    OnSelect: =cmpTicketRow.OnRowSelect()

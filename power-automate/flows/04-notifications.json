@@ -1,0 +1,881 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "flowName": "SD - Notifications Hub",
+    "flowDescription": "Centralized notification flow handling all service desk communication: new assignment alerts (email + Teams adaptive card), status change updates, SLA breach warnings (scheduled hourly), resolution satisfaction surveys, and escalation notifications. Each trigger scenario is implemented as a separate flow definition within this file for organizational clarity.",
+    "designNotes": {
+      "architecture": "This file contains five logical flow definitions bundled as a reference. In production, deploy each as a separate Power Automate flow. They share common parameters and connection references.",
+      "teamsNotifications": "Uses the 'Post adaptive card in a chat or channel' action with modern Adaptive Card schema v1.4 for rich ticket detail cards with action buttons.",
+      "emailTemplates": "All emails use consistent branding with the Service Desk header (Fluent blue #0078D4), Segoe UI typography, and structured ticket detail cards."
+    }
+  },
+  "flows": {
+    "flow_1_new_assignment_notification": {
+      "displayName": "SD - Notify: New Ticket Assigned",
+      "description": "Triggered when a ticket's AssignedTo field is modified. Sends email and Teams adaptive card to the newly assigned agent.",
+      "triggers": {
+        "When_ticket_assigned_to_is_modified": {
+          "type": "ApiConnection",
+          "kind": "V2",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/onupdateditems",
+            "queries": {
+              "$filter": "Status eq 'Assigned'"
+            }
+          },
+          "recurrence": {
+            "frequency": "Minute",
+            "interval": 1
+          },
+          "conditions": [
+            {
+              "expression": "@not(equals(triggerBody()?['AssignedTo']?['Email'], null))"
+            }
+          ],
+          "splitOn": "@triggerBody()?['value']",
+          "runtimeConfiguration": {
+            "concurrency": {
+              "runs": 10,
+              "maximumWaitingRuns": 50
+            }
+          }
+        }
+      },
+      "actions": {
+        "Get_full_ticket_details": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{triggerBody()?['ID']}"
+          },
+          "runAfter": {}
+        },
+        "Send_assignment_email_to_agent": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/Mail",
+            "body": {
+              "To": "@body('Get_full_ticket_details')?['AssignedTo']?['Email']",
+              "Subject": "New Ticket Assigned: @{body('Get_full_ticket_details')?['TicketID']} - @{body('Get_full_ticket_details')?['Title']}",
+              "Body": "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f5f5f5;font-family:'Segoe UI',sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding:20px 0;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);\"><tr><td style=\"background:#0078D4;padding:20px 32px;\"><h1 style=\"margin:0;color:#fff;font-size:18px;\">New Ticket Assigned to You</h1></td></tr><tr><td style=\"padding:24px 32px;\"><p style=\"margin:0 0 16px;color:#323130;font-size:15px;\">You have been assigned a new ticket. Please review the details below and take action.</p><table width=\"100%\" style=\"background:#f3f2f1;border-radius:6px;margin-bottom:20px;\"><tr><td style=\"padding:16px 20px;\"><table width=\"100%\"><tr><td style=\"padding:4px 0;\"><span style=\"color:#605e5c;font-size:12px;\">Ticket ID</span><br/><strong style=\"color:#0078D4;font-size:16px;\">@{body('Get_full_ticket_details')?['TicketID']}</strong></td><td style=\"padding:4px 0;\"><span style=\"color:#605e5c;font-size:12px;\">Priority</span><br/><strong style=\"color:#323130;\">@{body('Get_full_ticket_details')?['Priority']?['Value']}</strong></td></tr><tr><td style=\"padding:4px 0;\"><span style=\"color:#605e5c;font-size:12px;\">Department</span><br/><span style=\"color:#323130;\">@{body('Get_full_ticket_details')?['Department']?['Value']}</span></td><td style=\"padding:4px 0;\"><span style=\"color:#605e5c;font-size:12px;\">SLA Due</span><br/><span style=\"color:#323130;\">@{formatDateTime(body('Get_full_ticket_details')?['SLADueDate'], 'MMM dd, yyyy hh:mm tt')}</span></td></tr><tr><td colspan=\"2\" style=\"padding:8px 0 4px;\"><span style=\"color:#605e5c;font-size:12px;\">Subject</span><br/><span style=\"color:#323130;\">@{body('Get_full_ticket_details')?['Title']}</span></td></tr></table></td></tr></table><p style=\"margin:0;\"><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{body('Get_full_ticket_details')?['ID']}\" style=\"display:inline-block;background:#0078D4;color:#fff;padding:10px 24px;border-radius:4px;text-decoration:none;font-size:14px;font-weight:600;\">View Ticket</a></p></td></tr><tr><td style=\"padding:12px 32px;background:#faf9f8;border-top:1px solid #e1dfdd;\"><p style=\"margin:0;color:#a19f9d;font-size:11px;text-align:center;\">Automated notification from Service Desk</p></td></tr></table></td></tr></table></body></html>",
+              "IsHtml": true,
+              "Importance": "@if(equals(body('Get_full_ticket_details')?['Priority']?['Value'], 'Critical'), 'High', 'Normal')"
+            }
+          },
+          "runAfter": {
+            "Get_full_ticket_details": ["Succeeded"]
+          }
+        },
+        "Post_adaptive_card_to_Teams": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_teams']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v1.0/teams/@{parameters('TeamsTeamId')}/channels/@{parameters('TeamsChannelId')}/messages",
+            "body": {
+              "body": {
+                "contentType": "html",
+                "content": "<attachment id=\"ticket-card\"></attachment>"
+              },
+              "attachments": [
+                {
+                  "id": "ticket-card",
+                  "contentType": "application/vnd.microsoft.card.adaptive",
+                  "content": {
+                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "type": "AdaptiveCard",
+                    "version": "1.4",
+                    "body": [
+                      {
+                        "type": "ColumnSet",
+                        "columns": [
+                          {
+                            "type": "Column",
+                            "width": "auto",
+                            "items": [
+                              {
+                                "type": "Image",
+                                "url": "https://img.icons8.com/fluency/48/ticket.png",
+                                "size": "Small",
+                                "style": "Person"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "Column",
+                            "width": "stretch",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "text": "New Ticket Assigned",
+                                "weight": "Bolder",
+                                "size": "Medium",
+                                "color": "Accent",
+                                "wrap": true
+                              },
+                              {
+                                "type": "TextBlock",
+                                "text": "@{body('Get_full_ticket_details')?['TicketID']}",
+                                "spacing": "None",
+                                "isSubtle": true,
+                                "size": "Small"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "TextBlock",
+                        "text": "@{body('Get_full_ticket_details')?['Title']}",
+                        "weight": "Bolder",
+                        "size": "Medium",
+                        "wrap": true,
+                        "spacing": "Medium"
+                      },
+                      {
+                        "type": "ColumnSet",
+                        "separator": true,
+                        "spacing": "Medium",
+                        "columns": [
+                          {
+                            "type": "Column",
+                            "width": "1",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "text": "PRIORITY",
+                                "isSubtle": true,
+                                "size": "Small",
+                                "weight": "Bolder",
+                                "spacing": "None"
+                              },
+                              {
+                                "type": "TextBlock",
+                                "text": "@{body('Get_full_ticket_details')?['Priority']?['Value']}",
+                                "color": "@{if(equals(body('Get_full_ticket_details')?['Priority']?['Value'], 'Critical'), 'Attention', if(equals(body('Get_full_ticket_details')?['Priority']?['Value'], 'High'), 'Warning', 'Default'))}",
+                                "weight": "Bolder",
+                                "spacing": "None"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "Column",
+                            "width": "1",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "text": "DEPARTMENT",
+                                "isSubtle": true,
+                                "size": "Small",
+                                "weight": "Bolder",
+                                "spacing": "None"
+                              },
+                              {
+                                "type": "TextBlock",
+                                "text": "@{body('Get_full_ticket_details')?['Department']?['Value']}",
+                                "spacing": "None"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "Column",
+                            "width": "1",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "text": "SLA DUE",
+                                "isSubtle": true,
+                                "size": "Small",
+                                "weight": "Bolder",
+                                "spacing": "None"
+                              },
+                              {
+                                "type": "TextBlock",
+                                "text": "@{formatDateTime(body('Get_full_ticket_details')?['SLADueDate'], 'MMM dd, HH:mm')}",
+                                "spacing": "None"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "ColumnSet",
+                        "spacing": "Small",
+                        "columns": [
+                          {
+                            "type": "Column",
+                            "width": "1",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "text": "REQUESTER",
+                                "isSubtle": true,
+                                "size": "Small",
+                                "weight": "Bolder",
+                                "spacing": "None"
+                              },
+                              {
+                                "type": "TextBlock",
+                                "text": "@{body('Get_full_ticket_details')?['Requester']?['DisplayName']}",
+                                "spacing": "None"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "Column",
+                            "width": "1",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "text": "SOURCE",
+                                "isSubtle": true,
+                                "size": "Small",
+                                "weight": "Bolder",
+                                "spacing": "None"
+                              },
+                              {
+                                "type": "TextBlock",
+                                "text": "@{coalesce(body('Get_full_ticket_details')?['Source']?['Value'], 'Portal')}",
+                                "spacing": "None"
+                              }
+                            ]
+                          },
+                          {
+                            "type": "Column",
+                            "width": "1",
+                            "items": [
+                              {
+                                "type": "TextBlock",
+                                "text": "ASSIGNED TO",
+                                "isSubtle": true,
+                                "size": "Small",
+                                "weight": "Bolder",
+                                "spacing": "None"
+                              },
+                              {
+                                "type": "TextBlock",
+                                "text": "@{body('Get_full_ticket_details')?['AssignedTo']?['DisplayName']}",
+                                "spacing": "None"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "type": "TextBlock",
+                        "text": "@{take(body('Get_full_ticket_details')?['Description'], 200)}...",
+                        "wrap": true,
+                        "maxLines": 3,
+                        "isSubtle": true,
+                        "spacing": "Medium",
+                        "size": "Small"
+                      }
+                    ],
+                    "actions": [
+                      {
+                        "type": "Action.OpenUrl",
+                        "title": "View Ticket",
+                        "url": "@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{body('Get_full_ticket_details')?['ID']}",
+                        "style": "positive"
+                      },
+                      {
+                        "type": "Action.OpenUrl",
+                        "title": "Edit Ticket",
+                        "url": "@{parameters('SiteUrl')}/Lists/Tickets/EditForm.aspx?ID=@{body('Get_full_ticket_details')?['ID']}"
+                      },
+                      {
+                        "type": "Action.Submit",
+                        "title": "Acknowledge",
+                        "data": {
+                          "action": "acknowledge",
+                          "ticketId": "@{body('Get_full_ticket_details')?['TicketID']}",
+                          "itemId": "@{body('Get_full_ticket_details')?['ID']}"
+                        }
+                      }
+                    ],
+                    "msteams": {
+                      "width": "Full"
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "runAfter": {
+            "Get_full_ticket_details": ["Succeeded"]
+          }
+        }
+      }
+    },
+    "flow_2_status_change_notification": {
+      "displayName": "SD - Notify: Status Changed",
+      "description": "Triggered when a ticket's Status field is modified. Sends email update to the requester.",
+      "triggers": {
+        "When_ticket_status_is_modified": {
+          "type": "ApiConnection",
+          "kind": "V2",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/onupdateditems"
+          },
+          "recurrence": {
+            "frequency": "Minute",
+            "interval": 1
+          },
+          "splitOn": "@triggerBody()?['value']",
+          "runtimeConfiguration": {
+            "concurrency": {
+              "runs": 10,
+              "maximumWaitingRuns": 50
+            }
+          }
+        }
+      },
+      "actions": {
+        "Get_previous_version": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{triggerBody()?['ID']}/versions",
+            "queries": {
+              "$top": 2,
+              "$orderby": "Created desc"
+            }
+          },
+          "runAfter": {},
+          "description": "Get last two versions to compare Status field."
+        },
+        "Check_if_status_actually_changed": {
+          "type": "If",
+          "runAfter": {
+            "Get_previous_version": ["Succeeded"]
+          },
+          "expression": {
+            "and": [
+              {
+                "greater": [
+                  "@length(body('Get_previous_version')?['value'])",
+                  1
+                ]
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@body('Get_previous_version')?['value'][0]?['Status']",
+                    "@body('Get_previous_version')?['value'][1]?['Status']"
+                  ]
+                }
+              }
+            ]
+          },
+          "actions": {
+            "Get_ticket_for_notification": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                  }
+                },
+                "method": "get",
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{triggerBody()?['ID']}"
+              },
+              "runAfter": {}
+            },
+            "Send_status_update_email": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_office365']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/v2/Mail",
+                "body": {
+                  "To": "@body('Get_ticket_for_notification')?['Requester']?['Email']",
+                  "Subject": "Ticket Update: @{body('Get_ticket_for_notification')?['TicketID']} - Status changed to @{body('Get_ticket_for_notification')?['Status']?['Value']}",
+                  "Body": "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f5f5f5;font-family:'Segoe UI',sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding:20px 0;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);\"><tr><td style=\"background:#0078D4;padding:20px 32px;\"><h1 style=\"margin:0;color:#fff;font-size:18px;\">Ticket Status Update</h1></td></tr><tr><td style=\"padding:24px 32px;\"><p style=\"margin:0 0 16px;color:#323130;font-size:15px;\">Your ticket <strong>@{body('Get_ticket_for_notification')?['TicketID']}</strong> has been updated.</p><table width=\"100%\" style=\"background:#f3f2f1;border-radius:6px;margin-bottom:20px;\"><tr><td style=\"padding:16px 20px;\"><table width=\"100%\"><tr><td><span style=\"color:#605e5c;font-size:12px;\">Previous Status</span><br/><span style=\"color:#a19f9d;font-size:14px;text-decoration:line-through;\">@{body('Get_previous_version')?['value'][1]?['Status']}</span></td><td><span style=\"color:#605e5c;font-size:12px;\">New Status</span><br/><strong style=\"color:#0078D4;font-size:16px;\">@{body('Get_ticket_for_notification')?['Status']?['Value']}</strong></td></tr><tr><td colspan=\"2\" style=\"padding:8px 0 0;\"><span style=\"color:#605e5c;font-size:12px;\">Subject</span><br/><span style=\"color:#323130;\">@{body('Get_ticket_for_notification')?['Title']}</span></td></tr></table></td></tr></table><p style=\"margin:0;\"><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{body('Get_ticket_for_notification')?['ID']}\" style=\"display:inline-block;background:#0078D4;color:#fff;padding:10px 24px;border-radius:4px;text-decoration:none;font-size:14px;\">View Ticket</a></p></td></tr><tr><td style=\"padding:12px 32px;background:#faf9f8;border-top:1px solid #e1dfdd;\"><p style=\"margin:0;color:#a19f9d;font-size:11px;text-align:center;\">Automated notification from Service Desk</p></td></tr></table></td></tr></table></body></html>",
+                  "IsHtml": true
+                }
+              },
+              "runAfter": {
+                "Get_ticket_for_notification": ["Succeeded"]
+              }
+            }
+          },
+          "else": {},
+          "description": "Only send notification if the Status field actually changed between versions."
+        }
+      }
+    },
+    "flow_3_sla_breach_warning": {
+      "displayName": "SD - Notify: SLA Breach Approaching",
+      "description": "Scheduled flow running every hour. Finds tickets nearing SLA breach (within 2 hours) and notifies agents and leads.",
+      "triggers": {
+        "Recurrence_hourly": {
+          "type": "Recurrence",
+          "recurrence": {
+            "frequency": "Hour",
+            "interval": 1,
+            "schedule": {
+              "hours": ["7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18"],
+              "weekDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+            },
+            "timeZone": "UTC"
+          }
+        }
+      },
+      "actions": {
+        "Calculate_warning_threshold": {
+          "type": "Compose",
+          "inputs": "@addHours(utcNow(), 2)",
+          "runAfter": {},
+          "description": "Tickets with SLA due within the next 2 hours."
+        },
+        "Get_tickets_approaching_SLA": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items",
+            "queries": {
+              "$filter": "SLADueDate le '@{outputs('Calculate_warning_threshold')}' and SLADueDate ge '@{utcNow()}' and Status ne 'Resolved' and Status ne 'Closed'",
+              "$orderby": "SLADueDate asc",
+              "$top": 100
+            }
+          },
+          "runAfter": {
+            "Calculate_warning_threshold": ["Succeeded"]
+          }
+        },
+        "Loop_through_at_risk_tickets": {
+          "type": "Foreach",
+          "foreach": "@body('Get_tickets_approaching_SLA')?['value']",
+          "actions": {
+            "Send_SLA_warning_to_agent": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_office365']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/v2/Mail",
+                "body": {
+                  "To": "@items('Loop_through_at_risk_tickets')?['AssignedTo']?['Email']",
+                  "Cc": "@parameters('DepartmentLeadEmail')",
+                  "Subject": "SLA WARNING: @{items('Loop_through_at_risk_tickets')?['TicketID']} due @{formatDateTime(items('Loop_through_at_risk_tickets')?['SLADueDate'], 'MMM dd HH:mm')}",
+                  "Body": "<p><strong>SLA Breach Warning</strong></p><p>Ticket <strong>@{items('Loop_through_at_risk_tickets')?['TicketID']}</strong> is due within 2 hours.</p><p><strong>Subject:</strong> @{items('Loop_through_at_risk_tickets')?['Title']}<br/><strong>Priority:</strong> @{items('Loop_through_at_risk_tickets')?['Priority']?['Value']}<br/><strong>SLA Due:</strong> @{formatDateTime(items('Loop_through_at_risk_tickets')?['SLADueDate'], 'MMMM dd, yyyy hh:mm tt')} UTC<br/><strong>Time Remaining:</strong> @{dateDifference(utcNow(), items('Loop_through_at_risk_tickets')?['SLADueDate'])}</p><p><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{items('Loop_through_at_risk_tickets')?['ID']}\">View Ticket</a></p>",
+                  "IsHtml": true,
+                  "Importance": "High"
+                }
+              },
+              "runAfter": {}
+            }
+          },
+          "runAfter": {
+            "Get_tickets_approaching_SLA": ["Succeeded"]
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 5
+            }
+          }
+        }
+      }
+    },
+    "flow_4_resolution_survey": {
+      "displayName": "SD - Notify: Resolution Survey",
+      "description": "Triggered when a ticket status changes to Resolved. Sends a satisfaction survey email to the requester.",
+      "triggers": {
+        "When_ticket_resolved": {
+          "type": "ApiConnection",
+          "kind": "V2",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/onupdateditems",
+            "queries": {
+              "$filter": "Status eq 'Resolved'"
+            }
+          },
+          "recurrence": {
+            "frequency": "Minute",
+            "interval": 2
+          },
+          "splitOn": "@triggerBody()?['value']",
+          "runtimeConfiguration": {
+            "concurrency": {
+              "runs": 5,
+              "maximumWaitingRuns": 25
+            }
+          }
+        }
+      },
+      "actions": {
+        "Get_resolved_ticket": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{triggerBody()?['ID']}"
+          },
+          "runAfter": {}
+        },
+        "Send_satisfaction_survey": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/Mail",
+            "body": {
+              "To": "@body('Get_resolved_ticket')?['Requester']?['Email']",
+              "Subject": "Ticket Resolved: @{body('Get_resolved_ticket')?['TicketID']} - How did we do?",
+              "Body": "<!DOCTYPE html><html><body style=\"margin:0;padding:0;background:#f5f5f5;font-family:'Segoe UI',sans-serif;\"><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding:20px 0;\"><tr><td align=\"center\"><table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);\"><tr><td style=\"background:#107C10;padding:20px 32px;\"><h1 style=\"margin:0;color:#fff;font-size:18px;\">Your Ticket Has Been Resolved</h1></td></tr><tr><td style=\"padding:24px 32px;\"><p style=\"margin:0 0 16px;color:#323130;font-size:15px;\">Hello,</p><p style=\"margin:0 0 16px;color:#323130;font-size:15px;\">Your ticket <strong>@{body('Get_resolved_ticket')?['TicketID']}</strong> (@{body('Get_resolved_ticket')?['Title']}) has been marked as resolved.</p><div style=\"background:#f3f2f1;border-radius:6px;padding:16px 20px;margin-bottom:20px;\"><p style=\"margin:0 0 8px;color:#605e5c;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;\">Resolution Notes</p><p style=\"margin:0;color:#323130;font-size:14px;\">@{coalesce(body('Get_resolved_ticket')?['ResolutionNotes'], 'No resolution notes provided.')}</p></div><p style=\"margin:0 0 16px;color:#323130;font-size:15px;\">We would love to hear your feedback. How satisfied are you with the resolution?</p><table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td align=\"center\" style=\"padding:8px;\"><a href=\"@{parameters('SurveyBaseUrl')}?ticketId=@{body('Get_resolved_ticket')?['TicketID']}&rating=5\" style=\"display:inline-block;width:48px;height:48px;line-height:48px;text-align:center;font-size:28px;text-decoration:none;\" title=\"Excellent\">&#11088;</a><br/><span style=\"font-size:11px;color:#605e5c;\">Excellent</span></td><td align=\"center\" style=\"padding:8px;\"><a href=\"@{parameters('SurveyBaseUrl')}?ticketId=@{body('Get_resolved_ticket')?['TicketID']}&rating=4\" style=\"display:inline-block;width:48px;height:48px;line-height:48px;text-align:center;font-size:28px;text-decoration:none;\" title=\"Good\">&#128578;</a><br/><span style=\"font-size:11px;color:#605e5c;\">Good</span></td><td align=\"center\" style=\"padding:8px;\"><a href=\"@{parameters('SurveyBaseUrl')}?ticketId=@{body('Get_resolved_ticket')?['TicketID']}&rating=3\" style=\"display:inline-block;width:48px;height:48px;line-height:48px;text-align:center;font-size:28px;text-decoration:none;\" title=\"Average\">&#128528;</a><br/><span style=\"font-size:11px;color:#605e5c;\">Average</span></td><td align=\"center\" style=\"padding:8px;\"><a href=\"@{parameters('SurveyBaseUrl')}?ticketId=@{body('Get_resolved_ticket')?['TicketID']}&rating=2\" style=\"display:inline-block;width:48px;height:48px;line-height:48px;text-align:center;font-size:28px;text-decoration:none;\" title=\"Poor\">&#128533;</a><br/><span style=\"font-size:11px;color:#605e5c;\">Poor</span></td><td align=\"center\" style=\"padding:8px;\"><a href=\"@{parameters('SurveyBaseUrl')}?ticketId=@{body('Get_resolved_ticket')?['TicketID']}&rating=1\" style=\"display:inline-block;width:48px;height:48px;line-height:48px;text-align:center;font-size:28px;text-decoration:none;\" title=\"Very Poor\">&#128544;</a><br/><span style=\"font-size:11px;color:#605e5c;\">Very Poor</span></td></tr></table><p style=\"margin:16px 0 0;color:#605e5c;font-size:13px;\">If this issue is not resolved to your satisfaction, please reply to this email or <a href=\"@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{body('Get_resolved_ticket')?['ID']}\" style=\"color:#0078D4;\">reopen the ticket</a>.</p></td></tr><tr><td style=\"padding:12px 32px;background:#faf9f8;border-top:1px solid #e1dfdd;\"><p style=\"margin:0;color:#a19f9d;font-size:11px;text-align:center;\">Automated notification from Service Desk</p></td></tr></table></td></tr></table></body></html>",
+              "IsHtml": true
+            }
+          },
+          "runAfter": {
+            "Get_resolved_ticket": ["Succeeded"]
+          }
+        }
+      }
+    },
+    "flow_5_escalation_notification": {
+      "displayName": "SD - Notify: Escalation",
+      "description": "Triggered when a ticket's EscalationLevel changes. Notifies the appropriate lead or manager based on escalation level.",
+      "triggers": {
+        "When_ticket_escalation_changes": {
+          "type": "ApiConnection",
+          "kind": "V2",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/onupdateditems"
+          },
+          "recurrence": {
+            "frequency": "Minute",
+            "interval": 1
+          },
+          "splitOn": "@triggerBody()?['value']",
+          "conditions": [
+            {
+              "expression": "@greater(triggerBody()?['EscalationLevel'], 0)"
+            }
+          ],
+          "runtimeConfiguration": {
+            "concurrency": {
+              "runs": 5,
+              "maximumWaitingRuns": 25
+            }
+          }
+        }
+      },
+      "actions": {
+        "Get_escalated_ticket": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{triggerBody()?['ID']}"
+          },
+          "runAfter": {}
+        },
+        "Determine_escalation_recipient": {
+          "type": "Switch",
+          "runAfter": {
+            "Get_escalated_ticket": ["Succeeded"]
+          },
+          "expression": "@body('Get_escalated_ticket')?['EscalationLevel']",
+          "cases": {
+            "Level_1": {
+              "case": 1,
+              "actions": {
+                "Notify_agent_escalation_L1": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['shared_office365']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/v2/Mail",
+                    "body": {
+                      "To": "@body('Get_escalated_ticket')?['AssignedTo']?['Email']",
+                      "Cc": "@parameters('DepartmentLeadEmail')",
+                      "Subject": "ESCALATION L1: @{body('Get_escalated_ticket')?['TicketID']} - SLA Breached",
+                      "Body": "<p style=\"font-family:'Segoe UI',sans-serif;\"><strong style=\"color:#D83B01;\">Escalation Level 1 - SLA Breached</strong></p><p>Ticket <strong>@{body('Get_escalated_ticket')?['TicketID']}</strong> has breached its SLA and has been escalated.</p><p><strong>Title:</strong> @{body('Get_escalated_ticket')?['Title']}<br/><strong>Priority:</strong> @{body('Get_escalated_ticket')?['Priority']?['Value']}<br/><strong>SLA Due:</strong> @{formatDateTime(body('Get_escalated_ticket')?['SLADueDate'], 'MMM dd, yyyy HH:mm')} UTC<br/><strong>Department:</strong> @{body('Get_escalated_ticket')?['Department']?['Value']}</p><p>Please take immediate action to resolve this ticket.</p><p><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{body('Get_escalated_ticket')?['ID']}\">View Ticket</a></p>",
+                      "IsHtml": true,
+                      "Importance": "High"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              }
+            },
+            "Level_2": {
+              "case": 2,
+              "actions": {
+                "Notify_lead_escalation_L2": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['shared_office365']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/v2/Mail",
+                    "body": {
+                      "To": "@parameters('DepartmentLeadEmail')",
+                      "Cc": "@{body('Get_escalated_ticket')?['AssignedTo']?['Email']};@{parameters('ManagerEmail')}",
+                      "Subject": "ESCALATION L2: @{body('Get_escalated_ticket')?['TicketID']} - Requires Lead Attention",
+                      "Body": "<p style=\"font-family:'Segoe UI',sans-serif;\"><strong style=\"color:#A4262C;\">Escalation Level 2 - Lead Review Required</strong></p><p>Ticket <strong>@{body('Get_escalated_ticket')?['TicketID']}</strong> has been escalated to Level 2. Reassignment may be required.</p><p><strong>Title:</strong> @{body('Get_escalated_ticket')?['Title']}<br/><strong>Priority:</strong> @{body('Get_escalated_ticket')?['Priority']?['Value']}<br/><strong>Current Agent:</strong> @{body('Get_escalated_ticket')?['AssignedTo']?['DisplayName']}<br/><strong>SLA Due:</strong> @{formatDateTime(body('Get_escalated_ticket')?['SLADueDate'], 'MMM dd, yyyy HH:mm')} UTC<br/><strong>SLA Overdue By:</strong> @{dateDifference(body('Get_escalated_ticket')?['SLADueDate'], utcNow())}</p><p><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/EditForm.aspx?ID=@{body('Get_escalated_ticket')?['ID']}\">Reassign Ticket</a></p>",
+                      "IsHtml": true,
+                      "Importance": "High"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              }
+            },
+            "Level_3": {
+              "case": 3,
+              "actions": {
+                "Notify_manager_escalation_L3": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['shared_office365']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/v2/Mail",
+                    "body": {
+                      "To": "@parameters('ManagerEmail')",
+                      "Cc": "@{parameters('DepartmentLeadEmail')};@{body('Get_escalated_ticket')?['AssignedTo']?['Email']}",
+                      "Subject": "CRITICAL ESCALATION L3: @{body('Get_escalated_ticket')?['TicketID']} - Manager Action Required",
+                      "Body": "<p style=\"font-family:'Segoe UI',sans-serif;\"><strong style=\"color:#A4262C;\">CRITICAL Escalation Level 3 - Manager Action Required</strong></p><p>Ticket <strong>@{body('Get_escalated_ticket')?['TicketID']}</strong> has reached maximum escalation level. This ticket has been automatically marked as Critical priority.</p><p><strong>Title:</strong> @{body('Get_escalated_ticket')?['Title']}<br/><strong>Priority:</strong> Critical (auto-elevated)<br/><strong>Current Agent:</strong> @{body('Get_escalated_ticket')?['AssignedTo']?['DisplayName']}<br/><strong>Department:</strong> @{body('Get_escalated_ticket')?['Department']?['Value']}<br/><strong>SLA Due:</strong> @{formatDateTime(body('Get_escalated_ticket')?['SLADueDate'], 'MMM dd, yyyy HH:mm')} UTC<br/><strong>SLA Overdue By:</strong> @{dateDifference(body('Get_escalated_ticket')?['SLADueDate'], utcNow())}</p><p><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{body('Get_escalated_ticket')?['ID']}\">View Ticket</a> | <a href=\"@{parameters('SiteUrl')}/Lists/Tickets/EditForm.aspx?ID=@{body('Get_escalated_ticket')?['ID']}\">Edit Ticket</a></p>",
+                      "IsHtml": true,
+                      "Importance": "High"
+                    }
+                  },
+                  "runAfter": {}
+                },
+                "Post_critical_escalation_to_Teams": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['shared_teams']['connectionId']"
+                      }
+                    },
+                    "method": "post",
+                    "path": "/v1.0/teams/@{parameters('TeamsTeamId')}/channels/@{parameters('TeamsChannelId')}/messages",
+                    "body": {
+                      "body": {
+                        "contentType": "html",
+                        "content": "<attachment id=\"escalation-card\"></attachment>"
+                      },
+                      "attachments": [
+                        {
+                          "id": "escalation-card",
+                          "contentType": "application/vnd.microsoft.card.adaptive",
+                          "content": {
+                            "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                            "type": "AdaptiveCard",
+                            "version": "1.4",
+                            "body": [
+                              {
+                                "type": "Container",
+                                "style": "attention",
+                                "bleed": true,
+                                "items": [
+                                  {
+                                    "type": "TextBlock",
+                                    "text": "CRITICAL ESCALATION - Level 3",
+                                    "weight": "Bolder",
+                                    "size": "Medium",
+                                    "color": "Attention",
+                                    "horizontalAlignment": "Center"
+                                  }
+                                ]
+                              },
+                              {
+                                "type": "FactSet",
+                                "spacing": "Medium",
+                                "facts": [
+                                  { "title": "Ticket:", "value": "@{body('Get_escalated_ticket')?['TicketID']}" },
+                                  { "title": "Subject:", "value": "@{body('Get_escalated_ticket')?['Title']}" },
+                                  { "title": "Department:", "value": "@{body('Get_escalated_ticket')?['Department']?['Value']}" },
+                                  { "title": "Assigned To:", "value": "@{body('Get_escalated_ticket')?['AssignedTo']?['DisplayName']}" },
+                                  { "title": "SLA Due:", "value": "@{formatDateTime(body('Get_escalated_ticket')?['SLADueDate'], 'MMM dd, HH:mm')} UTC" },
+                                  { "title": "Overdue By:", "value": "@{dateDifference(body('Get_escalated_ticket')?['SLADueDate'], utcNow())}" }
+                                ]
+                              }
+                            ],
+                            "actions": [
+                              {
+                                "type": "Action.OpenUrl",
+                                "title": "View Ticket",
+                                "url": "@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{body('Get_escalated_ticket')?['ID']}",
+                                "style": "destructive"
+                              },
+                              {
+                                "type": "Action.OpenUrl",
+                                "title": "Reassign Ticket",
+                                "url": "@{parameters('SiteUrl')}/Lists/Tickets/EditForm.aspx?ID=@{body('Get_escalated_ticket')?['ID']}"
+                              }
+                            ],
+                            "msteams": { "width": "Full" }
+                          }
+                        }
+                      ]
+                    }
+                  },
+                  "runAfter": {}
+                }
+              }
+            }
+          },
+          "default": {
+            "actions": {}
+          }
+        }
+      }
+    }
+  },
+  "parameters": {
+    "$connections": {
+      "type": "Object",
+      "defaultValue": {}
+    },
+    "SiteUrl": {
+      "type": "String",
+      "defaultValue": "https://contoso.sharepoint.com/sites/ServiceDesk"
+    },
+    "TicketsListId": {
+      "type": "String",
+      "defaultValue": "Tickets"
+    },
+    "TeamsTeamId": {
+      "type": "String",
+      "metadata": {
+        "description": "The Teams team ID where service desk channels exist."
+      },
+      "defaultValue": ""
+    },
+    "TeamsChannelId": {
+      "type": "String",
+      "metadata": {
+        "description": "The Teams channel ID for service desk notifications."
+      },
+      "defaultValue": ""
+    },
+    "DepartmentLeadEmail": {
+      "type": "String",
+      "metadata": {
+        "description": "Email of the department lead for escalation notifications."
+      },
+      "defaultValue": "servicedesk-lead@contoso.com"
+    },
+    "ManagerEmail": {
+      "type": "String",
+      "metadata": {
+        "description": "Email of the manager for Level 3 escalation notifications."
+      },
+      "defaultValue": "it-manager@contoso.com"
+    },
+    "SurveyBaseUrl": {
+      "type": "String",
+      "metadata": {
+        "description": "Base URL for the satisfaction survey page or Microsoft Form."
+      },
+      "defaultValue": "https://contoso.sharepoint.com/sites/ServiceDesk/SitePages/Survey.aspx"
+    },
+    "FlowAdminEmail": {
+      "type": "String",
+      "defaultValue": "admin@contoso.com"
+    }
+  },
+  "connectionReferences": {
+    "shared_sharepointonline": {
+      "connectionName": "shared-sharepointonline",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "tier": "NotSpecified"
+    },
+    "shared_office365": {
+      "connectionName": "shared-office365",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+      "tier": "NotSpecified"
+    },
+    "shared_teams": {
+      "connectionName": "shared-teams",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_teams",
+      "tier": "NotSpecified"
+    }
+  }
+}

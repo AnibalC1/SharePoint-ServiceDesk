@@ -1,0 +1,589 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "flowName": "SD - Email to Ticket",
+    "flowDescription": "Converts incoming emails from a shared mailbox into service desk tickets. Parses subject, body, and sender; detects department from keywords; creates the SharePoint list item; saves attachments; and sends a branded confirmation email with the ticket ID back to the requester.",
+    "designNotes": {
+      "sharedMailbox": "Configure the trigger to monitor a shared mailbox such as support@company.com. The flow processes emails from external and internal senders.",
+      "departmentDetection": "A condition tree checks the subject and body for department-specific keywords. Priority order: IT > HR > Finance > Facilities > Operations (default). Keywords are case-insensitive via toLower().",
+      "attachments": "Attachments are saved to the ticket list item using the SharePoint 'Add Attachment' action inside an Apply to Each loop.",
+      "duplicatePrevention": "The flow marks processed emails by moving them to a 'Processed' folder. Emails that are auto-replies (header check) or from noreply addresses are skipped."
+    }
+  },
+  "triggers": {
+    "When_a_new_email_arrives_in_shared_mailbox": {
+      "type": "ApiConnection",
+      "kind": "V2",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['shared_office365']['connectionId']"
+          }
+        },
+        "method": "get",
+        "path": "/v2/SharedMailbox/Mail/OnNewEmail",
+        "queries": {
+          "mailboxAddress": "@parameters('SharedMailboxAddress')",
+          "folderId": "Inbox",
+          "importance": "Any",
+          "fetchOnlyWithAttachment": false,
+          "includeAttachments": true,
+          "subjectFilter": ""
+        }
+      },
+      "recurrence": {
+        "frequency": "Minute",
+        "interval": 2
+      },
+      "splitOn": "@triggerBody()?['value']",
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 3,
+          "maximumWaitingRuns": 25
+        }
+      }
+    }
+  },
+  "actions": {
+    "Initialize_Department": {
+      "type": "InitializeVariable",
+      "runAfter": {},
+      "inputs": {
+        "variables": [
+          {
+            "name": "Department",
+            "type": "string",
+            "value": "Operations"
+          }
+        ]
+      }
+    },
+    "Initialize_CreatedTicketId": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Initialize_Department": ["Succeeded"]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "CreatedTicketId",
+            "type": "integer",
+            "value": 0
+          }
+        ]
+      }
+    },
+    "Initialize_CleanSubject": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Initialize_CreatedTicketId": ["Succeeded"]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "CleanSubject",
+            "type": "string",
+            "value": "@if(startsWith(toLower(triggerBody()?['Subject']), 're: '), substring(triggerBody()?['Subject'], 4), if(startsWith(toLower(triggerBody()?['Subject']), 'fw: '), substring(triggerBody()?['Subject'], 4), triggerBody()?['Subject']))"
+          }
+        ]
+      },
+      "description": "Strip Re: and Fw: prefixes from the email subject."
+    },
+    "Initialize_PlainTextBody": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Initialize_CleanSubject": ["Succeeded"]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "PlainTextBody",
+            "type": "string",
+            "value": "@triggerBody()?['BodyPreview']"
+          }
+        ]
+      },
+      "description": "Use BodyPreview for plain text. The full HTML body goes into the Description field."
+    },
+    "Check_if_auto_reply_or_noreply": {
+      "type": "If",
+      "runAfter": {
+        "Initialize_PlainTextBody": ["Succeeded"]
+      },
+      "expression": {
+        "or": [
+          {
+            "contains": [
+              "@toLower(triggerBody()?['From'])",
+              "noreply"
+            ]
+          },
+          {
+            "contains": [
+              "@toLower(triggerBody()?['From'])",
+              "no-reply"
+            ]
+          },
+          {
+            "contains": [
+              "@toLower(triggerBody()?['From'])",
+              "mailer-daemon"
+            ]
+          },
+          {
+            "equals": [
+              "@triggerBody()?['IsRead']",
+              true
+            ]
+          }
+        ]
+      },
+      "actions": {
+        "Terminate_skip_auto_reply": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Cancelled",
+            "runError": {
+              "code": "SkippedAutoReply",
+              "message": "Email from @{triggerBody()?['From']} was identified as an auto-reply or noreply address. Skipping ticket creation."
+            }
+          },
+          "runAfter": {}
+        }
+      },
+      "else": {
+        "actions": {}
+      },
+      "description": "Skip auto-replies and noreply addresses to prevent ticket loops."
+    },
+    "Scope_-_Try_Create_Ticket": {
+      "type": "Scope",
+      "runAfter": {
+        "Check_if_auto_reply_or_noreply": ["Succeeded"]
+      },
+      "actions": {
+        "Detect_department_-_IT": {
+          "type": "If",
+          "runAfter": {},
+          "expression": {
+            "or": [
+              { "contains": ["@toLower(variables('CleanSubject'))", "password"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "vpn"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "laptop"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "computer"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "software"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "network"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "printer"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "access"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "email"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "outlook"] },
+              { "contains": ["@toLower(variables('CleanSubject'))", "teams"] },
+              { "contains": ["@toLower(variables('PlainTextBody'))", "password reset"] },
+              { "contains": ["@toLower(variables('PlainTextBody'))", "cannot login"] },
+              { "contains": ["@toLower(variables('PlainTextBody'))", "blue screen"] },
+              { "contains": ["@toLower(variables('PlainTextBody'))", "error message"] }
+            ]
+          },
+          "actions": {
+            "Set_Department_IT": {
+              "type": "SetVariable",
+              "inputs": { "name": "Department", "value": "IT" },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {
+              "Detect_department_-_HR": {
+                "type": "If",
+                "runAfter": {},
+                "expression": {
+                  "or": [
+                    { "contains": ["@toLower(variables('CleanSubject'))", "payroll"] },
+                    { "contains": ["@toLower(variables('CleanSubject'))", "leave"] },
+                    { "contains": ["@toLower(variables('CleanSubject'))", "vacation"] },
+                    { "contains": ["@toLower(variables('CleanSubject'))", "onboarding"] },
+                    { "contains": ["@toLower(variables('CleanSubject'))", "benefits"] },
+                    { "contains": ["@toLower(variables('CleanSubject'))", "hr "] },
+                    { "contains": ["@toLower(variables('PlainTextBody'))", "human resources"] },
+                    { "contains": ["@toLower(variables('PlainTextBody'))", "time off"] },
+                    { "contains": ["@toLower(variables('PlainTextBody'))", "sick leave"] }
+                  ]
+                },
+                "actions": {
+                  "Set_Department_HR": {
+                    "type": "SetVariable",
+                    "inputs": { "name": "Department", "value": "HR" },
+                    "runAfter": {}
+                  }
+                },
+                "else": {
+                  "actions": {
+                    "Detect_department_-_Finance": {
+                      "type": "If",
+                      "runAfter": {},
+                      "expression": {
+                        "or": [
+                          { "contains": ["@toLower(variables('CleanSubject'))", "invoice"] },
+                          { "contains": ["@toLower(variables('CleanSubject'))", "expense"] },
+                          { "contains": ["@toLower(variables('CleanSubject'))", "budget"] },
+                          { "contains": ["@toLower(variables('CleanSubject'))", "payment"] },
+                          { "contains": ["@toLower(variables('CleanSubject'))", "reimbursement"] },
+                          { "contains": ["@toLower(variables('PlainTextBody'))", "purchase order"] },
+                          { "contains": ["@toLower(variables('PlainTextBody'))", "cost center"] }
+                        ]
+                      },
+                      "actions": {
+                        "Set_Department_Finance": {
+                          "type": "SetVariable",
+                          "inputs": { "name": "Department", "value": "Finance" },
+                          "runAfter": {}
+                        }
+                      },
+                      "else": {
+                        "actions": {
+                          "Detect_department_-_Facilities": {
+                            "type": "If",
+                            "runAfter": {},
+                            "expression": {
+                              "or": [
+                                { "contains": ["@toLower(variables('CleanSubject'))", "building"] },
+                                { "contains": ["@toLower(variables('CleanSubject'))", "office"] },
+                                { "contains": ["@toLower(variables('CleanSubject'))", "parking"] },
+                                { "contains": ["@toLower(variables('CleanSubject'))", "hvac"] },
+                                { "contains": ["@toLower(variables('CleanSubject'))", "maintenance"] },
+                                { "contains": ["@toLower(variables('CleanSubject'))", "key card"] },
+                                { "contains": ["@toLower(variables('CleanSubject'))", "badge"] },
+                                { "contains": ["@toLower(variables('PlainTextBody'))", "air conditioning"] },
+                                { "contains": ["@toLower(variables('PlainTextBody'))", "desk setup"] },
+                                { "contains": ["@toLower(variables('PlainTextBody'))", "room booking"] }
+                              ]
+                            },
+                            "actions": {
+                              "Set_Department_Facilities": {
+                                "type": "SetVariable",
+                                "inputs": { "name": "Department", "value": "Facilities" },
+                                "runAfter": {}
+                              }
+                            },
+                            "else": {
+                              "actions": {
+                                "Set_Department_Operations_default": {
+                                  "type": "SetVariable",
+                                  "inputs": { "name": "Department", "value": "Operations" },
+                                  "runAfter": {},
+                                  "description": "Default department when no keywords match."
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "Create_ticket_in_SharePoint": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items",
+            "body": {
+              "Title": "@variables('CleanSubject')",
+              "Description": "@triggerBody()?['Body']",
+              "Department": {
+                "Value": "@variables('Department')"
+              },
+              "Priority": {
+                "Value": "Medium"
+              },
+              "Status": {
+                "Value": "New"
+              },
+              "Source": {
+                "Value": "Email"
+              },
+              "RequesterClaims": "@triggerBody()?['From']"
+            }
+          },
+          "runAfter": {
+            "Detect_department_-_IT": ["Succeeded"]
+          },
+          "runtimeConfiguration": {
+            "retryPolicy": {
+              "type": "exponential",
+              "count": 3,
+              "interval": "PT10S",
+              "minimumInterval": "PT10S",
+              "maximumInterval": "PT1M"
+            }
+          }
+        },
+        "Set_created_ticket_ID": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "CreatedTicketId",
+            "value": "@int(body('Create_ticket_in_SharePoint')?['ID'])"
+          },
+          "runAfter": {
+            "Create_ticket_in_SharePoint": ["Succeeded"]
+          }
+        },
+        "Check_for_attachments": {
+          "type": "If",
+          "runAfter": {
+            "Set_created_ticket_ID": ["Succeeded"]
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@triggerBody()?['HasAttachment']",
+                  true
+                ]
+              },
+              {
+                "greater": [
+                  "@length(triggerBody()?['Attachments'])",
+                  0
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Loop_through_attachments": {
+              "type": "Foreach",
+              "foreach": "@triggerBody()?['Attachments']",
+              "actions": {
+                "Check_attachment_size": {
+                  "type": "If",
+                  "runAfter": {},
+                  "expression": {
+                    "and": [
+                      {
+                        "lessOrEquals": [
+                          "@int(items('Loop_through_attachments')?['Size'])",
+                          26214400
+                        ]
+                      }
+                    ]
+                  },
+                  "actions": {
+                    "Add_attachment_to_ticket": {
+                      "type": "ApiConnection",
+                      "inputs": {
+                        "host": {
+                          "connection": {
+                            "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                          }
+                        },
+                        "method": "post",
+                        "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{variables('CreatedTicketId')}/attachments",
+                        "body": {
+                          "DisplayName": "@items('Loop_through_attachments')?['Name']",
+                          "ContentBytes": "@items('Loop_through_attachments')?['ContentBytes']"
+                        }
+                      },
+                      "runAfter": {},
+                      "runtimeConfiguration": {
+                        "retryPolicy": {
+                          "type": "exponential",
+                          "count": 2,
+                          "interval": "PT5S",
+                          "minimumInterval": "PT5S",
+                          "maximumInterval": "PT30S"
+                        }
+                      }
+                    }
+                  },
+                  "else": {},
+                  "description": "Only attach files under 25MB (SharePoint attachment limit)."
+                }
+              },
+              "runAfter": {},
+              "runtimeConfiguration": {
+                "concurrency": {
+                  "repetitions": 1
+                }
+              }
+            }
+          },
+          "else": {}
+        },
+        "Wait_for_ticket_ID_generation": {
+          "type": "Wait",
+          "inputs": {
+            "interval": {
+              "count": 10,
+              "unit": "Second"
+            }
+          },
+          "runAfter": {
+            "Check_for_attachments": ["Succeeded"]
+          },
+          "description": "Allow time for the Ticket ID Generator flow to assign the TicketID before fetching it for the confirmation email."
+        },
+        "Get_created_ticket_with_ID": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{variables('CreatedTicketId')}"
+          },
+          "runAfter": {
+            "Wait_for_ticket_ID_generation": ["Succeeded"]
+          }
+        },
+        "Send_confirmation_email": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/SharedMailbox/Mail",
+            "body": {
+              "MailboxAddress": "@parameters('SharedMailboxAddress')",
+              "To": "@triggerBody()?['From']",
+              "Subject": "Ticket Created: @{coalesce(body('Get_created_ticket_with_ID')?['TicketID'], concat('TMP-', variables('CreatedTicketId')))} - @{variables('CleanSubject')}",
+              "Body": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n</head>\n<body style=\"margin:0;padding:0;background-color:#f5f5f5;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;\">\n  <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color:#f5f5f5;padding:20px 0;\">\n    <tr>\n      <td align=\"center\">\n        <table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color:#ffffff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.1);\">\n          <!-- Header -->\n          <tr>\n            <td style=\"background-color:#0078D4;padding:24px 32px;\">\n              <h1 style=\"margin:0;color:#ffffff;font-size:20px;font-weight:600;\">Service Desk</h1>\n              <p style=\"margin:4px 0 0;color:#c7e0f4;font-size:13px;\">Your request has been received</p>\n            </td>\n          </tr>\n          <!-- Body -->\n          <tr>\n            <td style=\"padding:32px;\">\n              <p style=\"margin:0 0 16px;color:#323130;font-size:15px;line-height:1.5;\">Hello,</p>\n              <p style=\"margin:0 0 24px;color:#323130;font-size:15px;line-height:1.5;\">Thank you for contacting the Service Desk. Your request has been logged and a member of our team will be in touch shortly.</p>\n              \n              <!-- Ticket Details Card -->\n              <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background-color:#f3f2f1;border-radius:6px;margin-bottom:24px;\">\n                <tr>\n                  <td style=\"padding:20px 24px;\">\n                    <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">\n                      <tr>\n                        <td style=\"padding-bottom:12px;border-bottom:1px solid #e1dfdd;\">\n                          <span style=\"color:#605e5c;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;\">Ticket Reference</span><br/>\n                          <strong style=\"color:#0078D4;font-size:20px;\">@{coalesce(body('Get_created_ticket_with_ID')?['TicketID'], concat('TMP-', variables('CreatedTicketId')))}</strong>\n                        </td>\n                      </tr>\n                      <tr>\n                        <td style=\"padding-top:12px;\">\n                          <table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">\n                            <tr>\n                              <td width=\"50%\" style=\"padding:4px 0;\">\n                                <span style=\"color:#605e5c;font-size:12px;\">Subject</span><br/>\n                                <span style=\"color:#323130;font-size:14px;\">@{variables('CleanSubject')}</span>\n                              </td>\n                              <td width=\"50%\" style=\"padding:4px 0;\">\n                                <span style=\"color:#605e5c;font-size:12px;\">Department</span><br/>\n                                <span style=\"color:#323130;font-size:14px;\">@{variables('Department')}</span>\n                              </td>\n                            </tr>\n                            <tr>\n                              <td width=\"50%\" style=\"padding:4px 0;\">\n                                <span style=\"color:#605e5c;font-size:12px;\">Status</span><br/>\n                                <span style=\"color:#323130;font-size:14px;\">New</span>\n                              </td>\n                              <td width=\"50%\" style=\"padding:4px 0;\">\n                                <span style=\"color:#605e5c;font-size:12px;\">Priority</span><br/>\n                                <span style=\"color:#323130;font-size:14px;\">Medium</span>\n                              </td>\n                            </tr>\n                            <tr>\n                              <td colspan=\"2\" style=\"padding:4px 0;\">\n                                <span style=\"color:#605e5c;font-size:12px;\">Submitted</span><br/>\n                                <span style=\"color:#323130;font-size:14px;\">@{formatDateTime(utcNow(), 'MMMM dd, yyyy \\a\\t hh:mm tt')} UTC</span>\n                              </td>\n                            </tr>\n                          </table>\n                        </td>\n                      </tr>\n                    </table>\n                  </td>\n                </tr>\n              </table>\n\n              <p style=\"margin:0 0 16px;color:#323130;font-size:15px;line-height:1.5;\">You can track the status of your request by visiting the <a href=\"@{parameters('PortalUrl')}\" style=\"color:#0078D4;text-decoration:none;\">Service Desk Portal</a>.</p>\n              <p style=\"margin:0 0 4px;color:#605e5c;font-size:13px;\">Please reference <strong>@{coalesce(body('Get_created_ticket_with_ID')?['TicketID'], concat('TMP-', variables('CreatedTicketId')))}</strong> in any follow-up communications.</p>\n            </td>\n          </tr>\n          <!-- Footer -->\n          <tr>\n            <td style=\"padding:16px 32px;background-color:#faf9f8;border-top:1px solid #e1dfdd;\">\n              <p style=\"margin:0;color:#a19f9d;font-size:12px;text-align:center;\">This is an automated message from the Service Desk system. Please do not reply directly to this email.</p>\n            </td>\n          </tr>\n        </table>\n      </td>\n    </tr>\n  </table>\n</body>\n</html>",
+              "IsHtml": true,
+              "Importance": "Normal"
+            }
+          },
+          "runAfter": {
+            "Get_created_ticket_with_ID": ["Succeeded"]
+          },
+          "runtimeConfiguration": {
+            "retryPolicy": {
+              "type": "exponential",
+              "count": 3,
+              "interval": "PT10S",
+              "minimumInterval": "PT10S",
+              "maximumInterval": "PT1M"
+            }
+          }
+        },
+        "Move_email_to_processed_folder": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/SharedMailbox/Mail/Move/@{triggerBody()?['Id']}",
+            "body": {
+              "MailboxAddress": "@parameters('SharedMailboxAddress')",
+              "DestinationId": "Processed"
+            }
+          },
+          "runAfter": {
+            "Send_confirmation_email": ["Succeeded"]
+          }
+        }
+      }
+    },
+    "Scope_-_Catch_Email_Processing_Error": {
+      "type": "Scope",
+      "runAfter": {
+        "Scope_-_Try_Create_Ticket": ["Failed", "TimedOut"]
+      },
+      "actions": {
+        "Compose_email_error": {
+          "type": "Compose",
+          "inputs": {
+            "FlowName": "SD - Email to Ticket",
+            "EmailFrom": "@triggerBody()?['From']",
+            "EmailSubject": "@triggerBody()?['Subject']",
+            "ErrorTimestamp": "@utcNow()",
+            "FailedActions": "@filter(result('Scope_-_Try_Create_Ticket'), item => item?['status'] == 'Failed')"
+          },
+          "runAfter": {}
+        },
+        "Send_error_notification": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/Mail",
+            "body": {
+              "To": "@parameters('FlowAdminEmail')",
+              "Subject": "FLOW FAILURE: Email to Ticket - From @{triggerBody()?['From']}",
+              "Body": "<p><strong>Flow:</strong> SD - Email to Ticket</p><p><strong>From:</strong> @{triggerBody()?['From']}</p><p><strong>Subject:</strong> @{triggerBody()?['Subject']}</p><p><strong>Time:</strong> @{utcNow()}</p><p><strong>Error:</strong> @{outputs('Compose_email_error')}</p><p>The original email remains in the Inbox for manual processing.</p>",
+              "Importance": "High"
+            }
+          },
+          "runAfter": {
+            "Compose_email_error": ["Succeeded"]
+          }
+        }
+      }
+    }
+  },
+  "parameters": {
+    "$connections": {
+      "type": "Object",
+      "defaultValue": {}
+    },
+    "SiteUrl": {
+      "type": "String",
+      "defaultValue": "https://contoso.sharepoint.com/sites/ServiceDesk"
+    },
+    "TicketsListId": {
+      "type": "String",
+      "defaultValue": "Tickets"
+    },
+    "SharedMailboxAddress": {
+      "type": "String",
+      "metadata": {
+        "description": "The shared mailbox address that receives support requests (e.g., support@company.com)."
+      },
+      "defaultValue": "support@contoso.com"
+    },
+    "PortalUrl": {
+      "type": "String",
+      "metadata": {
+        "description": "URL to the Service Desk portal where requesters can track their tickets."
+      },
+      "defaultValue": "https://contoso.sharepoint.com/sites/ServiceDesk/SitePages/Portal.aspx"
+    },
+    "FlowAdminEmail": {
+      "type": "String",
+      "defaultValue": "admin@contoso.com"
+    }
+  },
+  "connectionReferences": {
+    "shared_sharepointonline": {
+      "connectionName": "shared-sharepointonline",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "tier": "NotSpecified"
+    },
+    "shared_office365": {
+      "connectionName": "shared-office365",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+      "tier": "NotSpecified"
+    }
+  }
+}

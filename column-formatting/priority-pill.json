@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "elmType": "div",
+  "style": {
+    "display": "flex",
+    "align-items": "center",
+    "justify-content": "center"
+  },
+  "children": [
+    {
+      "elmType": "span",
+      "style": {
+        "display": "inline-flex",
+        "align-items": "center",
+        "gap": "6px",
+        "padding": "4px 16px",
+        "border-radius": "16px",
+        "font-size": "12px",
+        "font-weight": "600",
+        "letter-spacing": "0.3px",
+        "white-space": "nowrap",
+        "cursor": "default",
+        "transition": "opacity 0.2s ease",
+        "min-width": "70px",
+        "text-align": "center",
+        "justify-content": "center",
+        "color": "=if(@currentField == 'Low', '#323130', '#ffffff')",
+        "background-color": "=if(@currentField == 'Low', '#F3F2F1', if(@currentField == 'Medium', '#0078D4', if(@currentField == 'High', '#D83B01', if(@currentField == 'Critical', '#A4262C', '#D2D0CE'))))",
+        "box-shadow": "=if(@currentField == 'Low', '0 1px 4px rgba(0,0,0,0.1)', if(@currentField == 'Medium', '0 1px 4px rgba(0,120,212,0.3)', if(@currentField == 'High', '0 1px 4px rgba(216,59,1,0.3)', if(@currentField == 'Critical', '0 1px 4px rgba(164,38,44,0.3)', 'none'))))"
+      },
+      "children": [
+        {
+          "elmType": "span",
+          "attributes": {
+            "iconName": "=if(@currentField == 'Critical', 'Warning', '')"
+          },
+          "style": {
+            "display": "=if(@currentField == 'Critical', 'inline', 'none')",
+            "font-size": "12px",
+            "color": "#ffffff"
+          }
+        },
+        {
+          "elmType": "span",
+          "txtContent": "@currentField",
+          "style": {
+            "line-height": "1"
+          }
+        }
+      ]
+    }
+  ]
+}

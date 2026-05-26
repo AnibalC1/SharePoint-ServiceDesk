@@ -1,0 +1,372 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "ColumnSet",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "auto",
+          "items": [
+            {
+              "type": "Container",
+              "style": "accent",
+              "bleed": false,
+              "minHeight": "40px",
+              "items": [
+                {
+                  "type": "Image",
+                  "url": "https://raw.githubusercontent.com/fluentui/fluentui-system-icons/main/assets/Ticket%20Diagonal/SVG/ic_fluent_ticket_diagonal_28_filled.svg",
+                  "width": "28px",
+                  "height": "28px",
+                  "horizontalAlignment": "center"
+                }
+              ],
+              "verticalContentAlignment": "center",
+              "padding": "small"
+            }
+          ],
+          "verticalContentAlignment": "center"
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "Service Desk Notification",
+              "weight": "bolder",
+              "size": "medium",
+              "color": "accent",
+              "spacing": "none"
+            },
+            {
+              "type": "TextBlock",
+              "text": "Ticket update requires your attention",
+              "size": "small",
+              "color": "dark",
+              "isSubtle": true,
+              "spacing": "none"
+            }
+          ],
+          "verticalContentAlignment": "center",
+          "padding": "small"
+        }
+      ],
+      "padding": "none",
+      "spacing": "none"
+    },
+    {
+      "type": "Container",
+      "separator": true,
+      "spacing": "medium",
+      "items": [
+        {
+          "type": "ColumnSet",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "stretch",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "${ticketId}",
+                  "weight": "bolder",
+                  "size": "large",
+                  "color": "accent"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "auto",
+              "items": [
+                {
+                  "type": "Container",
+                  "style": "${if(priority == 'Critical', 'attention', if(priority == 'High', 'warning', if(priority == 'Medium', 'accent', 'default')))}",
+                  "items": [
+                    {
+                      "type": "TextBlock",
+                      "text": "${priority}",
+                      "weight": "bolder",
+                      "size": "small",
+                      "horizontalAlignment": "center",
+                      "color": "${if(priority == 'Critical', 'attention', if(priority == 'High', 'warning', if(priority == 'Medium', 'accent', 'default')))}"
+                    }
+                  ],
+                  "padding": "small",
+                  "bleed": false
+                }
+              ],
+              "verticalContentAlignment": "center"
+            },
+            {
+              "type": "Column",
+              "width": "auto",
+              "items": [
+                {
+                  "type": "Container",
+                  "style": "${if(status == 'Resolved', 'good', if(status == 'In Progress', 'warning', if(status == 'Closed', 'default', 'accent')))}",
+                  "items": [
+                    {
+                      "type": "TextBlock",
+                      "text": "${status}",
+                      "weight": "bolder",
+                      "size": "small",
+                      "horizontalAlignment": "center",
+                      "color": "${if(status == 'Resolved', 'good', if(status == 'In Progress', 'warning', if(status == 'Closed', 'dark', 'accent')))}"
+                    }
+                  ],
+                  "padding": "small",
+                  "bleed": false
+                }
+              ],
+              "verticalContentAlignment": "center"
+            }
+          ]
+        },
+        {
+          "type": "TextBlock",
+          "text": "${title}",
+          "weight": "bolder",
+          "size": "medium",
+          "wrap": true,
+          "spacing": "small"
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "spacing": "medium",
+      "items": [
+        {
+          "type": "ColumnSet",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "1",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "Requester",
+                  "size": "small",
+                  "isSubtle": true,
+                  "weight": "bolder",
+                  "spacing": "none"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${requesterName}",
+                  "size": "small",
+                  "spacing": "none",
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "1",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "Assigned To",
+                  "size": "small",
+                  "isSubtle": true,
+                  "weight": "bolder",
+                  "spacing": "none"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${if(assigneeName, assigneeName, 'Unassigned')}",
+                  "size": "small",
+                  "spacing": "none",
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "1",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "Department",
+                  "size": "small",
+                  "isSubtle": true,
+                  "weight": "bolder",
+                  "spacing": "none"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${department}",
+                  "size": "small",
+                  "spacing": "none",
+                  "wrap": true
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "ColumnSet",
+          "spacing": "small",
+          "columns": [
+            {
+              "type": "Column",
+              "width": "1",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "Category",
+                  "size": "small",
+                  "isSubtle": true,
+                  "weight": "bolder",
+                  "spacing": "none"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${category}",
+                  "size": "small",
+                  "spacing": "none",
+                  "wrap": true
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "1",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "Created",
+                  "size": "small",
+                  "isSubtle": true,
+                  "weight": "bolder",
+                  "spacing": "none"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "{{DATE(${createdDate}, SHORT)}}",
+                  "size": "small",
+                  "spacing": "none"
+                }
+              ]
+            },
+            {
+              "type": "Column",
+              "width": "1",
+              "items": [
+                {
+                  "type": "TextBlock",
+                  "text": "SLA Due",
+                  "size": "small",
+                  "isSubtle": true,
+                  "weight": "bolder",
+                  "spacing": "none"
+                },
+                {
+                  "type": "TextBlock",
+                  "text": "${if(slaDueDate, formatDateTime(slaDueDate, 'MMM dd, hh:mm tt'), 'Not set')}",
+                  "size": "small",
+                  "spacing": "none",
+                  "color": "${if(slaBreached, 'attention', 'default')}",
+                  "weight": "${if(slaBreached, 'bolder', 'default')}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "spacing": "medium",
+      "isVisible": "${if(description, true, false)}",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "Description",
+          "size": "small",
+          "isSubtle": true,
+          "weight": "bolder"
+        },
+        {
+          "type": "TextBlock",
+          "text": "${description}",
+          "size": "small",
+          "wrap": true,
+          "maxLines": 3
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.OpenUrl",
+      "title": "View Ticket",
+      "url": "${ticketUrl}",
+      "iconUrl": "https://raw.githubusercontent.com/fluentui/fluentui-system-icons/main/assets/Open/SVG/ic_fluent_open_20_regular.svg",
+      "style": "positive"
+    },
+    {
+      "type": "Action.Submit",
+      "title": "Assign to Me",
+      "data": {
+        "action": "assignToMe",
+        "ticketId": "${ticketId}",
+        "ticketListItemId": "${listItemId}"
+      }
+    },
+    {
+      "type": "Action.ShowCard",
+      "title": "Change Status",
+      "card": {
+        "type": "AdaptiveCard",
+        "version": "1.5",
+        "body": [
+          {
+            "type": "Input.ChoiceSet",
+            "id": "newStatus",
+            "label": "Update status to:",
+            "isRequired": true,
+            "choices": [
+              { "title": "New", "value": "New" },
+              { "title": "Assigned", "value": "Assigned" },
+              { "title": "In Progress", "value": "In Progress" },
+              { "title": "Pending Requester", "value": "Pending Requester" },
+              { "title": "Resolved", "value": "Resolved" },
+              { "title": "Closed", "value": "Closed" }
+            ],
+            "value": "${status}",
+            "style": "compact"
+          },
+          {
+            "type": "Input.Text",
+            "id": "statusNote",
+            "label": "Note (optional)",
+            "placeholder": "Add a note about this status change...",
+            "isMultiline": true,
+            "maxLength": 500
+          }
+        ],
+        "actions": [
+          {
+            "type": "Action.Submit",
+            "title": "Update Status",
+            "data": {
+              "action": "changeStatus",
+              "ticketId": "${ticketId}",
+              "ticketListItemId": "${listItemId}"
+            },
+            "style": "positive"
+          }
+        ]
+      }
+    }
+  ],
+  "padding": "default",
+  "speak": "Service Desk notification for ticket ${ticketId}: ${title}. Priority: ${priority}. Status: ${status}.",
+  "fallbackText": "Service Desk Notification - ${ticketId}: ${title} | Priority: ${priority} | Status: ${status} | Requester: ${requesterName} | SLA Due: ${slaDueDate}. Open the Teams app to take action."
+}

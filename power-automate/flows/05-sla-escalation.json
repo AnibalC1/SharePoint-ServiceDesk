@@ -1,0 +1,673 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "flowName": "SD - SLA Escalation Engine",
+    "flowDescription": "Scheduled flow running every 30 minutes that monitors all open tickets for SLA breaches and applies tiered escalation. Level 0->1: notify agent. Level 1->2: notify lead, consider reassignment. Level 2->3: notify manager, auto-set priority to Critical. All escalation actions are logged to a SharePoint 'EscalationLog' list for audit trail.",
+    "designNotes": {
+      "schedule": "Runs every 30 minutes during business hours (Mon-Fri 07:00-19:00 UTC). Can be adjusted via the recurrence trigger.",
+      "escalationTiers": {
+        "level0to1": "SLA breached (SLADueDate < utcNow()). Action: Notify assigned agent, increment EscalationLevel to 1.",
+        "level1to2": "SLA breached AND EscalationLevel = 1 AND still not resolved after 30+ minutes at L1. Action: Notify department lead, consider reassignment to another available agent, increment to 2.",
+        "level2to3": "SLA breached AND EscalationLevel = 2 AND still not resolved after 30+ minutes at L2. Action: Notify manager, auto-set Priority to Critical, increment to 3."
+      },
+      "odataFilters": {
+        "allBreachedTickets": "SLADueDate lt '@{utcNow()}' and Status ne 'Resolved' and Status ne 'Closed'",
+        "level0Tickets": "SLADueDate lt '@{utcNow()}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 0",
+        "level1Tickets": "SLADueDate lt '@{utcNow()}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 1",
+        "level2Tickets": "SLADueDate lt '@{utcNow()}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 2"
+      },
+      "concurrency": "Trigger concurrency set to 1 (single run) since this is a scheduled batch job. Apply to Each loops use concurrency of 5 for parallel processing within the run.",
+      "errorHandling": "Each escalation tier is wrapped in its own Scope with a Catch block. Failures in one tier do not prevent other tiers from processing."
+    }
+  },
+  "triggers": {
+    "Recurrence_every_30_minutes": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Minute",
+        "interval": 30,
+        "schedule": {
+          "hours": ["7", "8", "9", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19"],
+          "weekDays": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        },
+        "timeZone": "UTC"
+      },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1
+        }
+      }
+    }
+  },
+  "actions": {
+    "Initialize_escalation_summary": {
+      "type": "InitializeVariable",
+      "runAfter": {},
+      "inputs": {
+        "variables": [
+          {
+            "name": "EscalationSummary",
+            "type": "array",
+            "value": []
+          }
+        ]
+      }
+    },
+    "Initialize_current_timestamp": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Initialize_escalation_summary": ["Succeeded"]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "RunTimestamp",
+            "type": "string",
+            "value": "@utcNow()"
+          }
+        ]
+      }
+    },
+    "Scope_-_Level_0_to_1_Escalation": {
+      "type": "Scope",
+      "runAfter": {
+        "Initialize_current_timestamp": ["Succeeded"]
+      },
+      "actions": {
+        "Get_level_0_breached_tickets": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items",
+            "queries": {
+              "$filter": "SLADueDate lt '@{variables('RunTimestamp')}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 0",
+              "$orderby": "SLADueDate asc",
+              "$top": 200
+            }
+          },
+          "runAfter": {},
+          "runtimeConfiguration": {
+            "paginationPolicy": {
+              "minimumItemCount": 200
+            }
+          },
+          "description": "OData filter: SLADueDate lt '@{utcNow()}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 0"
+        },
+        "Apply_to_each_L0_ticket": {
+          "type": "Foreach",
+          "foreach": "@body('Get_level_0_breached_tickets')?['value']",
+          "actions": {
+            "Update_ticket_to_escalation_L1": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                  }
+                },
+                "method": "patch",
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{items('Apply_to_each_L0_ticket')?['ID']}",
+                "body": {
+                  "EscalationLevel": 1
+                }
+              },
+              "runAfter": {},
+              "runtimeConfiguration": {
+                "retryPolicy": {
+                  "type": "exponential",
+                  "count": 2,
+                  "interval": "PT5S",
+                  "minimumInterval": "PT5S",
+                  "maximumInterval": "PT20S"
+                }
+              }
+            },
+            "Send_L1_notification_to_agent": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_office365']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/v2/Mail",
+                "body": {
+                  "To": "@items('Apply_to_each_L0_ticket')?['AssignedTo']?['Email']",
+                  "Subject": "SLA BREACHED - Escalation L1: @{items('Apply_to_each_L0_ticket')?['TicketID']} - @{items('Apply_to_each_L0_ticket')?['Title']}",
+                  "Body": "<!DOCTYPE html><html><body style=\"margin:0;padding:0;font-family:'Segoe UI',sans-serif;\"><div style=\"max-width:600px;margin:0 auto;\"><div style=\"background:#D83B01;padding:16px 24px;border-radius:8px 8px 0 0;\"><h2 style=\"margin:0;color:#fff;font-size:16px;\">SLA Breach - Escalation Level 1</h2></div><div style=\"background:#fff;padding:24px;border:1px solid #e1dfdd;border-top:none;border-radius:0 0 8px 8px;\"><p style=\"color:#323130;font-size:14px;\">Ticket <strong>@{items('Apply_to_each_L0_ticket')?['TicketID']}</strong> has breached its SLA deadline and has been escalated to Level 1.</p><table style=\"width:100%;background:#fff4ce;border-radius:4px;margin:16px 0;\"><tr><td style=\"padding:12px 16px;\"><table style=\"width:100%;\"><tr><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">Ticket:</strong> <span style=\"color:#323130;\">@{items('Apply_to_each_L0_ticket')?['TicketID']}</span></td><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">Priority:</strong> <span style=\"color:#323130;\">@{items('Apply_to_each_L0_ticket')?['Priority']?['Value']}</span></td></tr><tr><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">SLA Due:</strong> <span style=\"color:#A4262C;\">@{formatDateTime(items('Apply_to_each_L0_ticket')?['SLADueDate'], 'MMM dd, yyyy HH:mm')} UTC</span></td><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">Overdue:</strong> <span style=\"color:#A4262C;\">@{dateDifference(items('Apply_to_each_L0_ticket')?['SLADueDate'], variables('RunTimestamp'))}</span></td></tr><tr><td colspan=\"2\" style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">Subject:</strong> <span style=\"color:#323130;\">@{items('Apply_to_each_L0_ticket')?['Title']}</span></td></tr></table></td></tr></table><p style=\"color:#323130;font-size:14px;\"><strong>Action Required:</strong> Please update or resolve this ticket immediately. If unresolved, it will be escalated to the department lead within the next cycle.</p><p><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{items('Apply_to_each_L0_ticket')?['ID']}\" style=\"display:inline-block;background:#0078D4;color:#fff;padding:8px 20px;border-radius:4px;text-decoration:none;font-size:13px;\">View Ticket</a></p></div></div></body></html>",
+                  "IsHtml": true,
+                  "Importance": "High"
+                }
+              },
+              "runAfter": {
+                "Update_ticket_to_escalation_L1": ["Succeeded"]
+              }
+            },
+            "Log_L1_escalation": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('EscalationLogListId')))}/items",
+                "body": {
+                  "Title": "L0->L1: @{items('Apply_to_each_L0_ticket')?['TicketID']}",
+                  "TicketID": "@{items('Apply_to_each_L0_ticket')?['TicketID']}",
+                  "PreviousLevel": 0,
+                  "NewLevel": 1,
+                  "Action": "Notified assigned agent",
+                  "NotifiedUser": "@{items('Apply_to_each_L0_ticket')?['AssignedTo']?['Email']}",
+                  "EscalationTimestamp": "@{variables('RunTimestamp')}",
+                  "SLADueDate": "@{items('Apply_to_each_L0_ticket')?['SLADueDate']}",
+                  "OverdueBy": "@{dateDifference(items('Apply_to_each_L0_ticket')?['SLADueDate'], variables('RunTimestamp'))}"
+                }
+              },
+              "runAfter": {
+                "Send_L1_notification_to_agent": ["Succeeded"]
+              }
+            },
+            "Append_L1_to_summary": {
+              "type": "AppendToArrayVariable",
+              "inputs": {
+                "name": "EscalationSummary",
+                "value": {
+                  "TicketID": "@{items('Apply_to_each_L0_ticket')?['TicketID']}",
+                  "Level": "0 -> 1",
+                  "Agent": "@{items('Apply_to_each_L0_ticket')?['AssignedTo']?['DisplayName']}"
+                }
+              },
+              "runAfter": {
+                "Log_L1_escalation": ["Succeeded"]
+              }
+            }
+          },
+          "runAfter": {
+            "Get_level_0_breached_tickets": ["Succeeded"]
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 5
+            }
+          }
+        }
+      }
+    },
+    "Scope_-_Catch_L0_to_L1_Errors": {
+      "type": "Scope",
+      "runAfter": {
+        "Scope_-_Level_0_to_1_Escalation": ["Failed", "TimedOut"]
+      },
+      "actions": {
+        "Log_L0_L1_scope_error": {
+          "type": "Compose",
+          "inputs": {
+            "Scope": "Level 0 to 1 Escalation",
+            "Error": "@result('Scope_-_Level_0_to_1_Escalation')",
+            "Timestamp": "@variables('RunTimestamp')"
+          },
+          "runAfter": {}
+        }
+      }
+    },
+    "Scope_-_Level_1_to_2_Escalation": {
+      "type": "Scope",
+      "runAfter": {
+        "Scope_-_Level_0_to_1_Escalation": ["Succeeded", "Failed", "TimedOut"],
+        "Scope_-_Catch_L0_to_L1_Errors": ["Succeeded", "Skipped"]
+      },
+      "actions": {
+        "Get_level_1_breached_tickets": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items",
+            "queries": {
+              "$filter": "SLADueDate lt '@{variables('RunTimestamp')}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 1",
+              "$orderby": "SLADueDate asc",
+              "$top": 200
+            }
+          },
+          "runAfter": {},
+          "description": "OData filter: SLADueDate lt '@{utcNow()}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 1"
+        },
+        "Apply_to_each_L1_ticket": {
+          "type": "Foreach",
+          "foreach": "@body('Get_level_1_breached_tickets')?['value']",
+          "actions": {
+            "Get_available_agents_for_reassignment": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                  }
+                },
+                "method": "get",
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('AgentsListId')))}/items",
+                "queries": {
+                  "$filter": "Department eq '@{items('Apply_to_each_L1_ticket')?['Department']?['Value']}' and IsActive eq 1",
+                  "$orderby": "CurrentTickets asc",
+                  "$top": 5
+                }
+              },
+              "runAfter": {},
+              "description": "Check if there is a less-loaded agent available for reassignment."
+            },
+            "Filter_available_agents_L2": {
+              "type": "Query",
+              "inputs": {
+                "from": "@body('Get_available_agents_for_reassignment')?['value']",
+                "where": "@and(less(item()?['CurrentTickets'], item()?['MaxTickets']), not(equals(item()?['AgentEmail'], items('Apply_to_each_L1_ticket')?['AssignedTo']?['Email'])))"
+              },
+              "runAfter": {
+                "Get_available_agents_for_reassignment": ["Succeeded"]
+              },
+              "description": "Filter to agents under capacity AND not the currently assigned agent."
+            },
+            "Check_if_reassignment_possible": {
+              "type": "If",
+              "runAfter": {
+                "Filter_available_agents_L2": ["Succeeded"]
+              },
+              "expression": {
+                "and": [
+                  {
+                    "greater": [
+                      "@length(body('Filter_available_agents_L2'))",
+                      0
+                    ]
+                  }
+                ]
+              },
+              "actions": {
+                "Reassign_ticket": {
+                  "type": "ApiConnection",
+                  "inputs": {
+                    "host": {
+                      "connection": {
+                        "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                      }
+                    },
+                    "method": "patch",
+                    "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{items('Apply_to_each_L1_ticket')?['ID']}",
+                    "body": {
+                      "EscalationLevel": 2,
+                      "AssignedToClaims": "@{first(body('Filter_available_agents_L2'))?['AgentEmail']}"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              },
+              "else": {
+                "actions": {
+                  "Escalate_without_reassignment": {
+                    "type": "ApiConnection",
+                    "inputs": {
+                      "host": {
+                        "connection": {
+                          "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                        }
+                      },
+                      "method": "patch",
+                      "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{items('Apply_to_each_L1_ticket')?['ID']}",
+                      "body": {
+                        "EscalationLevel": 2
+                      }
+                    },
+                    "runAfter": {}
+                  }
+                }
+              }
+            },
+            "Send_L2_notification_to_lead": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_office365']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/v2/Mail",
+                "body": {
+                  "To": "@parameters('DepartmentLeadEmail')",
+                  "Cc": "@items('Apply_to_each_L1_ticket')?['AssignedTo']?['Email']",
+                  "Subject": "ESCALATION L2: @{items('Apply_to_each_L1_ticket')?['TicketID']} - Lead Review Required",
+                  "Body": "<p style=\"font-family:'Segoe UI',sans-serif;\"><strong style=\"color:#A4262C;\">Escalation Level 2 - Lead Review Required</strong></p><p>Ticket <strong>@{items('Apply_to_each_L1_ticket')?['TicketID']}</strong> has been at escalation Level 1 without resolution and is now escalated to Level 2.</p><p><strong>Title:</strong> @{items('Apply_to_each_L1_ticket')?['Title']}<br/><strong>Priority:</strong> @{items('Apply_to_each_L1_ticket')?['Priority']?['Value']}<br/><strong>Department:</strong> @{items('Apply_to_each_L1_ticket')?['Department']?['Value']}<br/><strong>SLA Due:</strong> @{formatDateTime(items('Apply_to_each_L1_ticket')?['SLADueDate'], 'MMM dd, yyyy HH:mm')} UTC<br/><strong>Reassigned:</strong> @{if(greater(length(body('Filter_available_agents_L2')), 0), concat('Yes, to ', first(body('Filter_available_agents_L2'))?['Title']), 'No - no agents available')}</p><p><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/EditForm.aspx?ID=@{items('Apply_to_each_L1_ticket')?['ID']}\">Review & Manage Ticket</a></p>",
+                  "IsHtml": true,
+                  "Importance": "High"
+                }
+              },
+              "runAfter": {
+                "Check_if_reassignment_possible": ["Succeeded"]
+              }
+            },
+            "Log_L2_escalation": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('EscalationLogListId')))}/items",
+                "body": {
+                  "Title": "L1->L2: @{items('Apply_to_each_L1_ticket')?['TicketID']}",
+                  "TicketID": "@{items('Apply_to_each_L1_ticket')?['TicketID']}",
+                  "PreviousLevel": 1,
+                  "NewLevel": 2,
+                  "Action": "@{if(greater(length(body('Filter_available_agents_L2')), 0), concat('Reassigned to ', first(body('Filter_available_agents_L2'))?['Title'], '. Notified department lead.'), 'Notified department lead. No reassignment (no available agents).')}",
+                  "NotifiedUser": "@{parameters('DepartmentLeadEmail')}",
+                  "EscalationTimestamp": "@{variables('RunTimestamp')}",
+                  "SLADueDate": "@{items('Apply_to_each_L1_ticket')?['SLADueDate']}",
+                  "OverdueBy": "@{dateDifference(items('Apply_to_each_L1_ticket')?['SLADueDate'], variables('RunTimestamp'))}"
+                }
+              },
+              "runAfter": {
+                "Send_L2_notification_to_lead": ["Succeeded"]
+              }
+            },
+            "Append_L2_to_summary": {
+              "type": "AppendToArrayVariable",
+              "inputs": {
+                "name": "EscalationSummary",
+                "value": {
+                  "TicketID": "@{items('Apply_to_each_L1_ticket')?['TicketID']}",
+                  "Level": "1 -> 2",
+                  "Reassigned": "@{if(greater(length(body('Filter_available_agents_L2')), 0), 'Yes', 'No')}"
+                }
+              },
+              "runAfter": {
+                "Log_L2_escalation": ["Succeeded"]
+              }
+            }
+          },
+          "runAfter": {
+            "Get_level_1_breached_tickets": ["Succeeded"]
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 5
+            }
+          }
+        }
+      }
+    },
+    "Scope_-_Catch_L1_to_L2_Errors": {
+      "type": "Scope",
+      "runAfter": {
+        "Scope_-_Level_1_to_2_Escalation": ["Failed", "TimedOut"]
+      },
+      "actions": {
+        "Log_L1_L2_scope_error": {
+          "type": "Compose",
+          "inputs": {
+            "Scope": "Level 1 to 2 Escalation",
+            "Error": "@result('Scope_-_Level_1_to_2_Escalation')",
+            "Timestamp": "@variables('RunTimestamp')"
+          },
+          "runAfter": {}
+        }
+      }
+    },
+    "Scope_-_Level_2_to_3_Escalation": {
+      "type": "Scope",
+      "runAfter": {
+        "Scope_-_Level_1_to_2_Escalation": ["Succeeded", "Failed", "TimedOut"],
+        "Scope_-_Catch_L1_to_L2_Errors": ["Succeeded", "Skipped"]
+      },
+      "actions": {
+        "Get_level_2_breached_tickets": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items",
+            "queries": {
+              "$filter": "SLADueDate lt '@{variables('RunTimestamp')}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 2",
+              "$orderby": "SLADueDate asc",
+              "$top": 200
+            }
+          },
+          "runAfter": {},
+          "description": "OData filter: SLADueDate lt '@{utcNow()}' and Status ne 'Resolved' and Status ne 'Closed' and EscalationLevel eq 2"
+        },
+        "Apply_to_each_L2_ticket": {
+          "type": "Foreach",
+          "foreach": "@body('Get_level_2_breached_tickets')?['value']",
+          "actions": {
+            "Update_ticket_to_critical_and_L3": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                  }
+                },
+                "method": "patch",
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{items('Apply_to_each_L2_ticket')?['ID']}",
+                "body": {
+                  "EscalationLevel": 3,
+                  "Priority": {
+                    "Value": "Critical"
+                  }
+                }
+              },
+              "runAfter": {},
+              "runtimeConfiguration": {
+                "retryPolicy": {
+                  "type": "exponential",
+                  "count": 2,
+                  "interval": "PT5S",
+                  "minimumInterval": "PT5S",
+                  "maximumInterval": "PT20S"
+                }
+              },
+              "description": "Set EscalationLevel to 3 and auto-elevate Priority to Critical."
+            },
+            "Send_L3_notification_to_manager": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_office365']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/v2/Mail",
+                "body": {
+                  "To": "@parameters('ManagerEmail')",
+                  "Cc": "@{parameters('DepartmentLeadEmail')};@{items('Apply_to_each_L2_ticket')?['AssignedTo']?['Email']}",
+                  "Subject": "CRITICAL ESCALATION L3: @{items('Apply_to_each_L2_ticket')?['TicketID']} - Manager Action Required",
+                  "Body": "<!DOCTYPE html><html><body style=\"margin:0;padding:0;font-family:'Segoe UI',sans-serif;\"><div style=\"max-width:600px;margin:0 auto;\"><div style=\"background:#A4262C;padding:16px 24px;border-radius:8px 8px 0 0;\"><h2 style=\"margin:0;color:#fff;font-size:16px;\">CRITICAL Escalation - Level 3</h2></div><div style=\"background:#fff;padding:24px;border:1px solid #e1dfdd;border-top:none;border-radius:0 0 8px 8px;\"><p style=\"color:#323130;font-size:14px;\">Ticket <strong>@{items('Apply_to_each_L2_ticket')?['TicketID']}</strong> has reached maximum escalation and requires your immediate attention. The priority has been automatically elevated to <strong style=\"color:#A4262C;\">Critical</strong>.</p><table style=\"width:100%;background:#FDE7E9;border-radius:4px;border-left:4px solid #A4262C;margin:16px 0;\"><tr><td style=\"padding:12px 16px;\"><table style=\"width:100%;\"><tr><td style=\"padding:2px 0;width:50%;\"><strong style=\"color:#605e5c;font-size:12px;\">Ticket:</strong> <span style=\"color:#323130;\">@{items('Apply_to_each_L2_ticket')?['TicketID']}</span></td><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">Priority:</strong> <strong style=\"color:#A4262C;\">Critical</strong></td></tr><tr><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">Department:</strong> <span style=\"color:#323130;\">@{items('Apply_to_each_L2_ticket')?['Department']?['Value']}</span></td><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">Assigned:</strong> <span style=\"color:#323130;\">@{items('Apply_to_each_L2_ticket')?['AssignedTo']?['DisplayName']}</span></td></tr><tr><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">SLA Due:</strong> <span style=\"color:#A4262C;\">@{formatDateTime(items('Apply_to_each_L2_ticket')?['SLADueDate'], 'MMM dd, yyyy HH:mm')} UTC</span></td><td style=\"padding:2px 0;\"><strong style=\"color:#605e5c;font-size:12px;\">Overdue:</strong> <span style=\"color:#A4262C;\">@{dateDifference(items('Apply_to_each_L2_ticket')?['SLADueDate'], variables('RunTimestamp'))}</span></td></tr><tr><td colspan=\"2\" style=\"padding:6px 0 2px;\"><strong style=\"color:#605e5c;font-size:12px;\">Subject:</strong> <span style=\"color:#323130;\">@{items('Apply_to_each_L2_ticket')?['Title']}</span></td></tr></table></td></tr></table><p style=\"color:#323130;font-size:14px;\"><strong>Action Required:</strong> This ticket requires immediate manager intervention. Please reassign, provide resources, or escalate to external support as necessary.</p><p><a href=\"@{parameters('SiteUrl')}/Lists/Tickets/DispForm.aspx?ID=@{items('Apply_to_each_L2_ticket')?['ID']}\" style=\"display:inline-block;background:#A4262C;color:#fff;padding:8px 20px;border-radius:4px;text-decoration:none;font-size:13px;margin-right:8px;\">View Ticket</a> <a href=\"@{parameters('SiteUrl')}/Lists/Tickets/EditForm.aspx?ID=@{items('Apply_to_each_L2_ticket')?['ID']}\" style=\"display:inline-block;background:#0078D4;color:#fff;padding:8px 20px;border-radius:4px;text-decoration:none;font-size:13px;\">Reassign Ticket</a></p></div></div></body></html>",
+                  "IsHtml": true,
+                  "Importance": "High"
+                }
+              },
+              "runAfter": {
+                "Update_ticket_to_critical_and_L3": ["Succeeded"]
+              }
+            },
+            "Log_L3_escalation": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                  }
+                },
+                "method": "post",
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('EscalationLogListId')))}/items",
+                "body": {
+                  "Title": "L2->L3: @{items('Apply_to_each_L2_ticket')?['TicketID']}",
+                  "TicketID": "@{items('Apply_to_each_L2_ticket')?['TicketID']}",
+                  "PreviousLevel": 2,
+                  "NewLevel": 3,
+                  "Action": "Notified manager. Priority auto-elevated to Critical.",
+                  "NotifiedUser": "@{parameters('ManagerEmail')}",
+                  "EscalationTimestamp": "@{variables('RunTimestamp')}",
+                  "SLADueDate": "@{items('Apply_to_each_L2_ticket')?['SLADueDate']}",
+                  "OverdueBy": "@{dateDifference(items('Apply_to_each_L2_ticket')?['SLADueDate'], variables('RunTimestamp'))}"
+                }
+              },
+              "runAfter": {
+                "Send_L3_notification_to_manager": ["Succeeded"]
+              }
+            },
+            "Append_L3_to_summary": {
+              "type": "AppendToArrayVariable",
+              "inputs": {
+                "name": "EscalationSummary",
+                "value": {
+                  "TicketID": "@{items('Apply_to_each_L2_ticket')?['TicketID']}",
+                  "Level": "2 -> 3",
+                  "AutoCritical": true
+                }
+              },
+              "runAfter": {
+                "Log_L3_escalation": ["Succeeded"]
+              }
+            }
+          },
+          "runAfter": {
+            "Get_level_2_breached_tickets": ["Succeeded"]
+          },
+          "runtimeConfiguration": {
+            "concurrency": {
+              "repetitions": 5
+            }
+          }
+        }
+      }
+    },
+    "Scope_-_Catch_L2_to_L3_Errors": {
+      "type": "Scope",
+      "runAfter": {
+        "Scope_-_Level_2_to_3_Escalation": ["Failed", "TimedOut"]
+      },
+      "actions": {
+        "Log_L2_L3_scope_error": {
+          "type": "Compose",
+          "inputs": {
+            "Scope": "Level 2 to 3 Escalation",
+            "Error": "@result('Scope_-_Level_2_to_3_Escalation')",
+            "Timestamp": "@variables('RunTimestamp')"
+          },
+          "runAfter": {}
+        }
+      }
+    },
+    "Send_escalation_run_summary": {
+      "type": "If",
+      "runAfter": {
+        "Scope_-_Level_2_to_3_Escalation": ["Succeeded", "Failed", "TimedOut"],
+        "Scope_-_Catch_L2_to_L3_Errors": ["Succeeded", "Skipped"]
+      },
+      "expression": {
+        "and": [
+          {
+            "greater": [
+              "@length(variables('EscalationSummary'))",
+              0
+            ]
+          }
+        ]
+      },
+      "actions": {
+        "Send_summary_to_admin": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/Mail",
+            "body": {
+              "To": "@parameters('FlowAdminEmail')",
+              "Subject": "SLA Escalation Summary - @{formatDateTime(variables('RunTimestamp'), 'MMM dd, yyyy HH:mm')} UTC - @{length(variables('EscalationSummary'))} ticket(s) escalated",
+              "Body": "<p style=\"font-family:'Segoe UI',sans-serif;\"><strong>SLA Escalation Run Summary</strong></p><p><strong>Run Time:</strong> @{formatDateTime(variables('RunTimestamp'), 'MMMM dd, yyyy HH:mm:ss')} UTC<br/><strong>Tickets Escalated:</strong> @{length(variables('EscalationSummary'))}</p><p><strong>Details:</strong></p><pre>@{json(variables('EscalationSummary'))}</pre>",
+              "IsHtml": true,
+              "Importance": "Normal"
+            }
+          },
+          "runAfter": {}
+        }
+      },
+      "else": {},
+      "description": "Only send summary email if at least one ticket was escalated."
+    }
+  },
+  "parameters": {
+    "$connections": {
+      "type": "Object",
+      "defaultValue": {}
+    },
+    "SiteUrl": {
+      "type": "String",
+      "defaultValue": "https://contoso.sharepoint.com/sites/ServiceDesk"
+    },
+    "TicketsListId": {
+      "type": "String",
+      "defaultValue": "Tickets"
+    },
+    "AgentsListId": {
+      "type": "String",
+      "defaultValue": "Agents"
+    },
+    "EscalationLogListId": {
+      "type": "String",
+      "metadata": {
+        "description": "GUID or name of the EscalationLog list. Expected fields: Title (Text), TicketID (Text), PreviousLevel (Number), NewLevel (Number), Action (Note), NotifiedUser (Text), EscalationTimestamp (DateTime), SLADueDate (DateTime), OverdueBy (Text)."
+      },
+      "defaultValue": "EscalationLog"
+    },
+    "DepartmentLeadEmail": {
+      "type": "String",
+      "defaultValue": "servicedesk-lead@contoso.com"
+    },
+    "ManagerEmail": {
+      "type": "String",
+      "defaultValue": "it-manager@contoso.com"
+    },
+    "FlowAdminEmail": {
+      "type": "String",
+      "defaultValue": "admin@contoso.com"
+    }
+  },
+  "connectionReferences": {
+    "shared_sharepointonline": {
+      "connectionName": "shared-sharepointonline",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "tier": "NotSpecified"
+    },
+    "shared_office365": {
+      "connectionName": "shared-office365",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+      "tier": "NotSpecified"
+    }
+  }
+}

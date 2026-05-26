@@ -1,0 +1,305 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "flowName": "SD - Ticket ID Generator",
+    "flowDescription": "Generates sequential ticket IDs in format INC-0001 when new items are created in the Tickets list. Uses a dedicated SharePoint 'Counters' list with a single row to track the last-used number, providing atomic incrementing via item versioning.",
+    "designNotes": {
+      "counterApproach": "A dedicated SharePoint list named 'Counters' holds a single item with fields: CounterName (Text, key='TicketID') and LastValue (Number). The flow reads this item, increments the value, and writes it back. SharePoint's built-in versioning on the Counters list provides optimistic concurrency. The flow's concurrency control is set to 1 (serial execution) to prevent race conditions when multiple tickets are created simultaneously.",
+      "idFormat": "INC-XXXX where XXXX is a zero-padded 4-digit number (e.g., INC-0001, INC-0042, INC-1337). The expression concat('INC-', formatNumber(variables('counter'), '0000')) handles formatting. Numbers above 9999 will naturally extend to 5+ digits.",
+      "errorHandling": "A Try-Catch pattern using Scope actions ensures that if any step fails, the error is logged and the flow owner is notified. The Catch scope runs on failure/timeout of the Try scope.",
+      "concurrency": "The trigger concurrency is set to 1 (sequential processing) to prevent duplicate IDs when multiple tickets arrive at the same time."
+    }
+  },
+  "triggers": {
+    "When_a_new_ticket_is_created": {
+      "type": "ApiConnection",
+      "kind": "V2",
+      "inputs": {
+        "host": {
+          "connection": {
+            "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+          }
+        },
+        "method": "get",
+        "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/onnewitems"
+      },
+      "recurrence": {
+        "frequency": "Minute",
+        "interval": 1
+      },
+      "splitOn": "@triggerBody()?['value']",
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1,
+          "maximumWaitingRuns": 50
+        }
+      }
+    }
+  },
+  "actions": {
+    "Initialize_counter_variable": {
+      "type": "InitializeVariable",
+      "runAfter": {},
+      "inputs": {
+        "variables": [
+          {
+            "name": "counter",
+            "type": "integer",
+            "value": 0
+          }
+        ]
+      }
+    },
+    "Initialize_ticketId_variable": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Initialize_counter_variable": ["Succeeded"]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "ticketId",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Scope_-_Try_Generate_Ticket_ID": {
+      "type": "Scope",
+      "runAfter": {
+        "Initialize_ticketId_variable": ["Succeeded"]
+      },
+      "actions": {
+        "Get_counter_item": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "get",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('CountersListId')))}/items",
+            "queries": {
+              "$filter": "CounterName eq 'TicketID'",
+              "$top": 1
+            }
+          },
+          "runAfter": {},
+          "runtimeConfiguration": {
+            "paginationPolicy": {
+              "minimumItemCount": 1
+            }
+          }
+        },
+        "Check_if_counter_exists": {
+          "type": "If",
+          "runAfter": {
+            "Get_counter_item": ["Succeeded"]
+          },
+          "expression": {
+            "and": [
+              {
+                "greater": [
+                  "@length(body('Get_counter_item')?['value'])",
+                  0
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Set_counter_from_existing": {
+              "type": "SetVariable",
+              "inputs": {
+                "name": "counter",
+                "value": "@add(int(first(body('Get_counter_item')?['value'])?['LastValue']), 1)"
+              },
+              "runAfter": {}
+            },
+            "Update_counter_item": {
+              "type": "ApiConnection",
+              "inputs": {
+                "host": {
+                  "connection": {
+                    "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                  }
+                },
+                "method": "patch",
+                "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('CountersListId')))}/items/@{first(body('Get_counter_item')?['value'])?['ID']}",
+                "body": {
+                  "LastValue": "@variables('counter')"
+                }
+              },
+              "runAfter": {
+                "Set_counter_from_existing": ["Succeeded"]
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Set_counter_to_1": {
+                "type": "SetVariable",
+                "inputs": {
+                  "name": "counter",
+                  "value": 1
+                },
+                "runAfter": {}
+              },
+              "Create_counter_item": {
+                "type": "ApiConnection",
+                "inputs": {
+                  "host": {
+                    "connection": {
+                      "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+                    }
+                  },
+                  "method": "post",
+                  "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('CountersListId')))}/items",
+                  "body": {
+                    "CounterName": "TicketID",
+                    "LastValue": 1
+                  }
+                },
+                "runAfter": {
+                  "Set_counter_to_1": ["Succeeded"]
+                }
+              }
+            }
+          }
+        },
+        "Format_Ticket_ID": {
+          "type": "SetVariable",
+          "runAfter": {
+            "Check_if_counter_exists": ["Succeeded"]
+          },
+          "inputs": {
+            "name": "ticketId",
+            "value": "@concat('INC-', formatNumber(variables('counter'), '0000'))"
+          }
+        },
+        "Update_ticket_with_TicketID": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_sharepointonline']['connectionId']"
+              }
+            },
+            "method": "patch",
+            "path": "/datasets/@{encodeURIComponent(encodeURIComponent(parameters('SiteUrl')))}/tables/@{encodeURIComponent(encodeURIComponent(parameters('TicketsListId')))}/items/@{triggerBody()?['ID']}",
+            "body": {
+              "TicketID": "@variables('ticketId')"
+            }
+          },
+          "runAfter": {
+            "Format_Ticket_ID": ["Succeeded"]
+          },
+          "runtimeConfiguration": {
+            "retryPolicy": {
+              "type": "exponential",
+              "count": 3,
+              "interval": "PT10S",
+              "minimumInterval": "PT10S",
+              "maximumInterval": "PT1M"
+            }
+          }
+        }
+      }
+    },
+    "Scope_-_Catch_Error": {
+      "type": "Scope",
+      "runAfter": {
+        "Scope_-_Try_Generate_Ticket_ID": ["Failed", "TimedOut"]
+      },
+      "actions": {
+        "Compose_error_details": {
+          "type": "Compose",
+          "inputs": {
+            "FlowName": "SD - Ticket ID Generator",
+            "TicketListItemId": "@triggerBody()?['ID']",
+            "ErrorTimestamp": "@utcNow()",
+            "ErrorResult": "@result('Scope_-_Try_Generate_Ticket_ID')",
+            "FailedActionName": "@first(filter(result('Scope_-_Try_Generate_Ticket_ID'), item => item?['status'] == 'Failed'))?['name']",
+            "ErrorMessage": "@first(filter(result('Scope_-_Try_Generate_Ticket_ID'), item => item?['status'] == 'Failed'))?['error']?['message']"
+          },
+          "runAfter": {}
+        },
+        "Send_failure_notification": {
+          "type": "ApiConnection",
+          "inputs": {
+            "host": {
+              "connection": {
+                "name": "@parameters('$connections')['shared_office365']['connectionId']"
+              }
+            },
+            "method": "post",
+            "path": "/v2/Mail",
+            "body": {
+              "To": "@parameters('FlowAdminEmail')",
+              "Subject": "FLOW FAILURE: Ticket ID Generator - Item @{triggerBody()?['ID']}",
+              "Body": "<p><strong>Flow:</strong> SD - Ticket ID Generator<br><strong>Trigger Item ID:</strong> @{triggerBody()?['ID']}<br><strong>Time:</strong> @{utcNow()}<br><strong>Error:</strong> @{outputs('Compose_error_details')}</p>",
+              "Importance": "High"
+            }
+          },
+          "runAfter": {
+            "Compose_error_details": ["Succeeded"]
+          }
+        }
+      }
+    }
+  },
+  "parameters": {
+    "$connections": {
+      "type": "Object",
+      "defaultValue": {}
+    },
+    "SiteUrl": {
+      "type": "String",
+      "metadata": {
+        "schemaName": "SiteUrl",
+        "description": "SharePoint site URL (e.g., https://contoso.sharepoint.com/sites/ServiceDesk)"
+      },
+      "defaultValue": "https://contoso.sharepoint.com/sites/ServiceDesk"
+    },
+    "TicketsListId": {
+      "type": "String",
+      "metadata": {
+        "schemaName": "TicketsListId",
+        "description": "GUID or name of the Tickets list"
+      },
+      "defaultValue": "Tickets"
+    },
+    "CountersListId": {
+      "type": "String",
+      "metadata": {
+        "schemaName": "CountersListId",
+        "description": "GUID or name of the Counters list used for sequential ID tracking. This list must have fields: CounterName (Text), LastValue (Number)."
+      },
+      "defaultValue": "Counters"
+    },
+    "FlowAdminEmail": {
+      "type": "String",
+      "metadata": {
+        "schemaName": "FlowAdminEmail",
+        "description": "Email address to receive flow failure notifications"
+      },
+      "defaultValue": "admin@contoso.com"
+    }
+  },
+  "connectionReferences": {
+    "shared_sharepointonline": {
+      "connectionName": "shared-sharepointonline",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "tier": "NotSpecified"
+    },
+    "shared_office365": {
+      "connectionName": "shared-office365",
+      "source": "Invoker",
+      "id": "/providers/Microsoft.PowerApps/apis/shared_office365",
+      "tier": "NotSpecified"
+    }
+  }
+}

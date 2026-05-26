@@ -1,0 +1,183 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "{{SERVICE_DESK_APP_ID}}",
+  "developer": {
+    "name": "Service Desk Team",
+    "websiteUrl": "https://{{TENANT_NAME}}.sharepoint.com/sites/ServiceDesk",
+    "privacyUrl": "https://{{TENANT_NAME}}.sharepoint.com/sites/ServiceDesk/SitePages/Privacy.aspx",
+    "termsOfUseUrl": "https://{{TENANT_NAME}}.sharepoint.com/sites/ServiceDesk/SitePages/Terms.aspx"
+  },
+  "name": {
+    "short": "Service Desk",
+    "full": "Service Desk - IT & Departmental Support"
+  },
+  "description": {
+    "short": "Submit, track, and manage service desk tickets directly from Microsoft Teams.",
+    "full": "The Service Desk app provides a comprehensive IT and departmental support experience within Microsoft Teams. Submit new tickets, track existing requests, receive real-time notifications, and manage your workload without leaving Teams. Features include: ticket submission via adaptive cards, status tracking, SLA monitoring, agent assignment, and Power BI analytics integration. Built on SharePoint Online and Power Platform for seamless Microsoft 365 integration."
+  },
+  "icons": {
+    "color": "icon-color-192x192.png",
+    "outline": "icon-outline-32x32.png"
+  },
+  "accentColor": "#0078D4",
+  "staticTabs": [
+    {
+      "entityId": "service-desk-portal",
+      "name": "My Tickets",
+      "contentUrl": "https://apps.powerapps.com/play/e/{{ENVIRONMENT_ID}}/a/{{APP_ID}}?source=teamstab&tenantId={{TENANT_ID}}&screenName=MyTicketsScreen",
+      "websiteUrl": "https://{{TENANT_NAME}}.sharepoint.com/sites/ServiceDesk",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "service-desk-new-ticket",
+      "name": "New Ticket",
+      "contentUrl": "https://apps.powerapps.com/play/e/{{ENVIRONMENT_ID}}/a/{{APP_ID}}?source=teamstab&tenantId={{TENANT_ID}}&screenName=NewTicketScreen",
+      "websiteUrl": "https://{{TENANT_NAME}}.sharepoint.com/sites/ServiceDesk",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "service-desk-dashboard",
+      "name": "Dashboard",
+      "contentUrl": "https://app.powerbi.com/reportEmbed?reportId={{REPORT_ID}}&autoAuth=true&ctid={{TENANT_ID}}",
+      "websiteUrl": "https://app.powerbi.com/reports/{{REPORT_ID}}",
+      "scopes": ["personal"]
+    },
+    {
+      "entityId": "service-desk-about",
+      "name": "About",
+      "contentUrl": "https://{{TENANT_NAME}}.sharepoint.com/sites/ServiceDesk/SitePages/About.aspx",
+      "scopes": ["personal"]
+    }
+  ],
+  "configurableTabs": [
+    {
+      "configurationUrl": "https://{{TENANT_NAME}}.sharepoint.com/sites/ServiceDesk/_layouts/15/TeamsLogon.aspx?SPFX=true&dest=/_layouts/15/teamshostedapp.aspx%3Fteams%26personal%26componentId={{SPFX_COMPONENT_ID}}%26forceLocale={locale}",
+      "canUpdateConfiguration": true,
+      "scopes": ["team", "groupChat"],
+      "supportedSharePointHosts": ["sharePointFullPage", "sharePointWebPart"]
+    }
+  ],
+  "bots": [
+    {
+      "botId": "{{BOT_APP_ID}}",
+      "scopes": ["personal", "team", "groupChat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false,
+      "commandLists": [
+        {
+          "scopes": ["personal"],
+          "commands": [
+            {
+              "title": "status",
+              "description": "Check the status of a ticket (e.g., status INC-0042)"
+            },
+            {
+              "title": "my-tickets",
+              "description": "List your open tickets"
+            },
+            {
+              "title": "create",
+              "description": "Create a new support ticket"
+            },
+            {
+              "title": "summary",
+              "description": "Get a summary of today's service desk activity"
+            },
+            {
+              "title": "help",
+              "description": "Show available commands and usage"
+            }
+          ]
+        },
+        {
+          "scopes": ["team", "groupChat"],
+          "commands": [
+            {
+              "title": "status",
+              "description": "Check a ticket's status (e.g., @Service Desk status INC-0042)"
+            },
+            {
+              "title": "create",
+              "description": "Create a new ticket in this channel"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "composeExtensions": [
+    {
+      "botId": "{{BOT_APP_ID}}",
+      "type": "botBased",
+      "commands": [
+        {
+          "id": "createTicketFromMessage",
+          "type": "action",
+          "title": "Create Ticket",
+          "description": "Create a service desk ticket from this message",
+          "context": ["message", "compose"],
+          "fetchTask": true,
+          "parameters": []
+        },
+        {
+          "id": "searchTickets",
+          "type": "query",
+          "title": "Search Tickets",
+          "description": "Search for existing service desk tickets",
+          "initialRun": true,
+          "parameters": [
+            {
+              "name": "searchQuery",
+              "title": "Search",
+              "description": "Search by ticket ID, title, or keywords",
+              "inputType": "text"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "devicePermissions": [
+    "notifications"
+  ],
+  "validDomains": [
+    "{{TENANT_NAME}}.sharepoint.com",
+    "apps.powerapps.com",
+    "app.powerbi.com",
+    "login.microsoftonline.com",
+    "*.sharepoint.com"
+  ],
+  "webApplicationInfo": {
+    "id": "{{AAD_APP_CLIENT_ID}}",
+    "resource": "api://{{TENANT_NAME}}.sharepoint.com/{{AAD_APP_CLIENT_ID}}"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "name": "ChannelMessage.Read.Group",
+          "type": "Application"
+        },
+        {
+          "name": "TeamSettings.Read.Group",
+          "type": "Application"
+        },
+        {
+          "name": "Member.Read.Group",
+          "type": "Application"
+        }
+      ]
+    }
+  },
+  "defaultInstallScope": "personal",
+  "defaultGroupCapability": {
+    "team": "tab",
+    "groupChat": "bot"
+  }
+}

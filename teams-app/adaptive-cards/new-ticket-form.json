@@ -1,0 +1,175 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "ColumnSet",
+      "columns": [
+        {
+          "type": "Column",
+          "width": "auto",
+          "items": [
+            {
+              "type": "Image",
+              "url": "https://raw.githubusercontent.com/fluentui/fluentui-system-icons/main/assets/Ticket%20Diagonal/SVG/ic_fluent_ticket_diagonal_28_filled.svg",
+              "width": "28px",
+              "height": "28px"
+            }
+          ],
+          "verticalContentAlignment": "center"
+        },
+        {
+          "type": "Column",
+          "width": "stretch",
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "New Support Ticket",
+              "weight": "bolder",
+              "size": "large",
+              "color": "accent",
+              "spacing": "none"
+            },
+            {
+              "type": "TextBlock",
+              "text": "Submit a request to the Service Desk team",
+              "size": "small",
+              "isSubtle": true,
+              "spacing": "none"
+            }
+          ],
+          "verticalContentAlignment": "center"
+        }
+      ],
+      "spacing": "none"
+    },
+    {
+      "type": "Container",
+      "separator": true,
+      "spacing": "medium",
+      "items": [
+        {
+          "type": "Input.ChoiceSet",
+          "id": "department",
+          "label": "Department",
+          "isRequired": true,
+          "errorMessage": "Please select a department.",
+          "style": "compact",
+          "placeholder": "Select department...",
+          "choices": [
+            { "title": "IT", "value": "IT" },
+            { "title": "HR", "value": "HR" },
+            { "title": "Operations", "value": "Operations" },
+            { "title": "Finance", "value": "Finance" },
+            { "title": "Facilities", "value": "Facilities" }
+          ]
+        },
+        {
+          "type": "Input.ChoiceSet",
+          "id": "category",
+          "label": "Category",
+          "isRequired": false,
+          "style": "compact",
+          "placeholder": "Select category...",
+          "choices": [
+            { "title": "Hardware", "value": "Hardware" },
+            { "title": "Software", "value": "Software" },
+            { "title": "Network / Connectivity", "value": "Network" },
+            { "title": "Account / Access", "value": "Account Access" },
+            { "title": "Email / Calendar", "value": "Email" },
+            { "title": "Printer / Peripherals", "value": "Printer" },
+            { "title": "Phone / Mobile", "value": "Phone" },
+            { "title": "Onboarding / Offboarding", "value": "Onboarding" },
+            { "title": "Facilities Request", "value": "Facilities" },
+            { "title": "Other", "value": "Other" }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "spacing": "medium",
+      "items": [
+        {
+          "type": "Input.Text",
+          "id": "title",
+          "label": "Title",
+          "isRequired": true,
+          "errorMessage": "Please enter a brief summary of your issue.",
+          "placeholder": "Brief summary of the issue or request...",
+          "maxLength": 255
+        },
+        {
+          "type": "Input.Text",
+          "id": "description",
+          "label": "Description",
+          "isRequired": false,
+          "placeholder": "Provide details about your issue. Include steps to reproduce, error messages, or any relevant information...",
+          "isMultiline": true,
+          "maxLength": 2000
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "spacing": "medium",
+      "items": [
+        {
+          "type": "Input.ChoiceSet",
+          "id": "priority",
+          "label": "Priority",
+          "isRequired": true,
+          "errorMessage": "Please select a priority level.",
+          "value": "Medium",
+          "style": "expanded",
+          "choices": [
+            {
+              "title": "🟢  Low -- General question or minor issue, no immediate impact",
+              "value": "Low"
+            },
+            {
+              "title": "🟡  Medium -- Standard issue affecting your work, workaround may exist",
+              "value": "Medium"
+            },
+            {
+              "title": "🟠  High -- Significant impact on your work, no workaround available",
+              "value": "High"
+            },
+            {
+              "title": "🔴  Critical -- Complete work stoppage or security incident, needs immediate attention",
+              "value": "Critical"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Container",
+      "spacing": "small",
+      "items": [
+        {
+          "type": "TextBlock",
+          "text": "Expected response times: Low 8h | Medium 4h | High 1h | Critical 30min",
+          "size": "small",
+          "isSubtle": true,
+          "horizontalAlignment": "center",
+          "wrap": true
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "Action.Submit",
+      "title": "Submit Ticket",
+      "data": {
+        "action": "createTicket",
+        "source": "Teams"
+      },
+      "style": "positive"
+    }
+  ],
+  "padding": "default",
+  "fallbackText": "This card requires Adaptive Cards v1.5 support. Please use the Service Desk portal to submit a new ticket: https://contoso.sharepoint.com/sites/ServiceDesk"
+}

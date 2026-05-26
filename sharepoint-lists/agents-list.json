@@ -1,0 +1,153 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/pnp/provisioning-schema-2022-09",
+  "listName": "Agents",
+  "listDescription": "Service Desk agents and their assignments, skills, and availability for ticket routing.",
+  "baseTemplate": "GenericList",
+  "contentTypesEnabled": true,
+  "enableVersioning": true,
+  "majorVersionLimit": 20,
+  "hidden": false,
+  "onQuickLaunch": true,
+  "fields": [
+    {
+      "InternalName": "Title",
+      "DisplayName": "Agent Name",
+      "Type": "Text",
+      "Required": true,
+      "MaxLength": 255,
+      "Indexed": true,
+      "Description": "Full name of the service desk agent."
+    },
+    {
+      "InternalName": "Email",
+      "DisplayName": "Email",
+      "Type": "Text",
+      "Required": true,
+      "MaxLength": 255,
+      "Indexed": true,
+      "EnforceUniqueValues": true,
+      "Description": "Email address of the agent, used for notifications and identity matching.",
+      "SchemaXml": "<Field Type=\"Text\" DisplayName=\"Email\" Required=\"TRUE\" EnforceUniqueValues=\"TRUE\" Indexed=\"TRUE\" MaxLength=\"255\" ID=\"{7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d}\" StaticName=\"Email\" Name=\"Email\" Description=\"Email address of the agent, used for notifications and identity matching.\" />"
+    },
+    {
+      "InternalName": "Department",
+      "DisplayName": "Department",
+      "Type": "Choice",
+      "Required": true,
+      "Format": "Dropdown",
+      "FillInChoice": false,
+      "Description": "Primary department this agent supports.",
+      "Choices": [
+        "IT",
+        "HR",
+        "Operations",
+        "Finance",
+        "Facilities"
+      ],
+      "SchemaXml": "<Field Type=\"Choice\" DisplayName=\"Department\" Required=\"TRUE\" Format=\"Dropdown\" FillInChoice=\"FALSE\" ID=\"{8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e}\" StaticName=\"Department\" Name=\"Department\" Description=\"Primary department this agent supports.\"><Default></Default><CHOICES><CHOICE>IT</CHOICE><CHOICE>HR</CHOICE><CHOICE>Operations</CHOICE><CHOICE>Finance</CHOICE><CHOICE>Facilities</CHOICE></CHOICES></Field>"
+    },
+    {
+      "InternalName": "Role",
+      "DisplayName": "Role",
+      "Type": "Choice",
+      "Required": true,
+      "Format": "Dropdown",
+      "FillInChoice": false,
+      "Description": "Role of the agent within the service desk hierarchy.",
+      "Choices": [
+        "Agent",
+        "Lead",
+        "Manager"
+      ],
+      "SchemaXml": "<Field Type=\"Choice\" DisplayName=\"Role\" Required=\"TRUE\" Format=\"Dropdown\" FillInChoice=\"FALSE\" ID=\"{9c0d1e2f-3a4b-5c6d-7e8f-9a0b1c2d3e4f}\" StaticName=\"Role\" Name=\"Role\" Description=\"Role of the agent within the service desk hierarchy.\"><Default>Agent</Default><CHOICES><CHOICE>Agent</CHOICE><CHOICE>Lead</CHOICE><CHOICE>Manager</CHOICE></CHOICES></Field>"
+    },
+    {
+      "InternalName": "IsActive",
+      "DisplayName": "Is Active",
+      "Type": "Boolean",
+      "Required": false,
+      "Default": true,
+      "Description": "Whether this agent is currently active and available for ticket assignment.",
+      "SchemaXml": "<Field Type=\"Boolean\" DisplayName=\"Is Active\" Required=\"FALSE\" ID=\"{0d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a}\" StaticName=\"IsActive\" Name=\"IsActive\" Description=\"Whether this agent is currently active and available for ticket assignment.\"><Default>1</Default></Field>"
+    },
+    {
+      "InternalName": "MaxTickets",
+      "DisplayName": "Max Tickets",
+      "Type": "Number",
+      "Required": false,
+      "Min": 1,
+      "Max": 100,
+      "Decimals": 0,
+      "Default": 10,
+      "Description": "Maximum number of tickets this agent can be assigned concurrently.",
+      "SchemaXml": "<Field Type=\"Number\" DisplayName=\"Max Tickets\" Required=\"FALSE\" Min=\"1\" Max=\"100\" Decimals=\"0\" ID=\"{1e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b}\" StaticName=\"MaxTickets\" Name=\"MaxTickets\" Description=\"Maximum number of tickets this agent can be assigned concurrently.\"><Default>10</Default></Field>"
+    },
+    {
+      "InternalName": "Skills",
+      "DisplayName": "Skills",
+      "Type": "Note",
+      "Required": false,
+      "RichText": false,
+      "NumberOfLines": 4,
+      "Description": "Comma-separated list of agent specialties and skill areas (e.g., Networking, Active Directory, Payroll, Benefits).",
+      "SchemaXml": "<Field Type=\"Note\" DisplayName=\"Skills\" Required=\"FALSE\" RichText=\"FALSE\" NumLines=\"4\" ID=\"{2f3a4b5c-6d7e-8f9a-0b1c-2d3e4f5a6b7c}\" StaticName=\"Skills\" Name=\"Skills\" Description=\"Comma-separated list of agent specialties and skill areas (e.g., Networking, Active Directory, Payroll, Benefits).\" />"
+    }
+  ],
+  "views": [
+    {
+      "viewName": "All Agents",
+      "isDefault": true,
+      "rowLimit": 50,
+      "paged": true,
+      "query": "<OrderBy><FieldRef Name=\"Department\" Ascending=\"TRUE\" /><FieldRef Name=\"Title\" Ascending=\"TRUE\" /></OrderBy>",
+      "viewFields": [
+        "Title",
+        "Email",
+        "Department",
+        "Role",
+        "IsActive",
+        "MaxTickets",
+        "Skills"
+      ]
+    },
+    {
+      "viewName": "Active Agents",
+      "isDefault": false,
+      "rowLimit": 50,
+      "paged": true,
+      "query": "<Where><Eq><FieldRef Name=\"IsActive\" /><Value Type=\"Boolean\">1</Value></Eq></Where><OrderBy><FieldRef Name=\"Department\" Ascending=\"TRUE\" /><FieldRef Name=\"Title\" Ascending=\"TRUE\" /></OrderBy>",
+      "viewFields": [
+        "Title",
+        "Email",
+        "Department",
+        "Role",
+        "MaxTickets",
+        "Skills"
+      ]
+    },
+    {
+      "viewName": "Agents by Department",
+      "isDefault": false,
+      "rowLimit": 50,
+      "paged": true,
+      "query": "<GroupBy Collapse=\"TRUE\" GroupLimit=\"30\"><FieldRef Name=\"Department\" /></GroupBy><OrderBy><FieldRef Name=\"Role\" Ascending=\"TRUE\" /><FieldRef Name=\"Title\" Ascending=\"TRUE\" /></OrderBy>",
+      "viewFields": [
+        "Title",
+        "Email",
+        "Department",
+        "Role",
+        "IsActive",
+        "MaxTickets",
+        "Skills"
+      ]
+    }
+  ],
+  "contentTypes": [
+    {
+      "id": "0x0100C3D4E5F6A7B8C9D0E1F2A3B4C5D6",
+      "name": "Service Desk Agent",
+      "description": "Content type for service desk agent records.",
+      "group": "Service Desk Content Types"
+    }
+  ]
+}

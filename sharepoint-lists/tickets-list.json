@@ -1,0 +1,278 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/pnp/provisioning-schema-2022-09",
+  "listName": "Tickets",
+  "listDescription": "Service Desk ticket tracking list for managing IT and departmental support requests.",
+  "baseTemplate": "GenericList",
+  "contentTypesEnabled": true,
+  "enableVersioning": true,
+  "majorVersionLimit": 50,
+  "hidden": false,
+  "onQuickLaunch": true,
+  "fields": [
+    {
+      "InternalName": "TicketID",
+      "DisplayName": "Ticket ID",
+      "Type": "Text",
+      "Required": false,
+      "MaxLength": 20,
+      "Indexed": true,
+      "EnforceUniqueValues": true,
+      "Description": "Auto-generated ticket identifier (e.g., INC-0001). Populated by Power Automate.",
+      "SchemaXml": "<Field Type=\"Text\" DisplayName=\"Ticket ID\" Required=\"FALSE\" EnforceUniqueValues=\"TRUE\" Indexed=\"TRUE\" MaxLength=\"20\" ID=\"{b1e2c3d4-5f6a-7b8c-9d0e-1f2a3b4c5d6e}\" StaticName=\"TicketID\" Name=\"TicketID\" Description=\"Auto-generated ticket identifier (e.g., INC-0001). Populated by Power Automate.\" />"
+    },
+    {
+      "InternalName": "Title",
+      "DisplayName": "Title",
+      "Type": "Text",
+      "Required": true,
+      "MaxLength": 255,
+      "Description": "Brief summary of the issue or request."
+    },
+    {
+      "InternalName": "Description",
+      "DisplayName": "Description",
+      "Type": "Note",
+      "Required": false,
+      "RichText": true,
+      "RichTextMode": "FullHtml",
+      "NumberOfLines": 10,
+      "AppendOnly": false,
+      "Description": "Detailed description of the issue, including steps to reproduce if applicable.",
+      "SchemaXml": "<Field Type=\"Note\" DisplayName=\"Description\" Required=\"FALSE\" RichText=\"TRUE\" RichTextMode=\"FullHtml\" NumLines=\"10\" AppendOnly=\"FALSE\" ID=\"{a2b3c4d5-6e7f-8a9b-0c1d-2e3f4a5b6c7d}\" StaticName=\"Description\" Name=\"Description\" Description=\"Detailed description of the issue, including steps to reproduce if applicable.\" />"
+    },
+    {
+      "InternalName": "Department",
+      "DisplayName": "Department",
+      "Type": "Choice",
+      "Required": true,
+      "Format": "Dropdown",
+      "FillInChoice": false,
+      "Description": "Department this ticket belongs to.",
+      "Choices": [
+        "IT",
+        "HR",
+        "Operations",
+        "Finance",
+        "Facilities"
+      ],
+      "SchemaXml": "<Field Type=\"Choice\" DisplayName=\"Department\" Required=\"TRUE\" Format=\"Dropdown\" FillInChoice=\"FALSE\" ID=\"{c3d4e5f6-7a8b-9c0d-1e2f-3a4b5c6d7e8f}\" StaticName=\"Department\" Name=\"Department\" Description=\"Department this ticket belongs to.\"><Default></Default><CHOICES><CHOICE>IT</CHOICE><CHOICE>HR</CHOICE><CHOICE>Operations</CHOICE><CHOICE>Finance</CHOICE><CHOICE>Facilities</CHOICE></CHOICES></Field>"
+    },
+    {
+      "InternalName": "Category",
+      "DisplayName": "Category",
+      "Type": "Lookup",
+      "Required": false,
+      "LookupList": "Categories",
+      "LookupField": "Title",
+      "Description": "Category of the ticket, linked to the Categories list.",
+      "SchemaXml": "<Field Type=\"Lookup\" DisplayName=\"Category\" Required=\"FALSE\" List=\"Categories\" ShowField=\"Title\" ID=\"{d4e5f6a7-8b9c-0d1e-2f3a-4b5c6d7e8f9a}\" StaticName=\"Category\" Name=\"Category\" Description=\"Category of the ticket, linked to the Categories list.\" />"
+    },
+    {
+      "InternalName": "Priority",
+      "DisplayName": "Priority",
+      "Type": "Choice",
+      "Required": false,
+      "Format": "Dropdown",
+      "FillInChoice": false,
+      "Default": "Medium",
+      "Description": "Priority level of the ticket.",
+      "Choices": [
+        "Low",
+        "Medium",
+        "High",
+        "Critical"
+      ],
+      "SchemaXml": "<Field Type=\"Choice\" DisplayName=\"Priority\" Required=\"FALSE\" Format=\"Dropdown\" FillInChoice=\"FALSE\" ID=\"{e5f6a7b8-9c0d-1e2f-3a4b-5c6d7e8f9a0b}\" StaticName=\"Priority\" Name=\"Priority\" Description=\"Priority level of the ticket.\"><Default>Medium</Default><CHOICES><CHOICE>Low</CHOICE><CHOICE>Medium</CHOICE><CHOICE>High</CHOICE><CHOICE>Critical</CHOICE></CHOICES></Field>"
+    },
+    {
+      "InternalName": "Status",
+      "DisplayName": "Status",
+      "Type": "Choice",
+      "Required": false,
+      "Format": "Dropdown",
+      "FillInChoice": false,
+      "Default": "New",
+      "Description": "Current status of the ticket.",
+      "Choices": [
+        "New",
+        "Assigned",
+        "In Progress",
+        "Pending Requester",
+        "Resolved",
+        "Closed"
+      ],
+      "SchemaXml": "<Field Type=\"Choice\" DisplayName=\"Status\" Required=\"FALSE\" Format=\"Dropdown\" FillInChoice=\"FALSE\" ID=\"{f6a7b8c9-0d1e-2f3a-4b5c-6d7e8f9a0b1c}\" StaticName=\"Status\" Name=\"Status\" Description=\"Current status of the ticket.\"><Default>New</Default><CHOICES><CHOICE>New</CHOICE><CHOICE>Assigned</CHOICE><CHOICE>In Progress</CHOICE><CHOICE>Pending Requester</CHOICE><CHOICE>Resolved</CHOICE><CHOICE>Closed</CHOICE></CHOICES></Field>"
+    },
+    {
+      "InternalName": "Requester",
+      "DisplayName": "Requester",
+      "Type": "User",
+      "Required": false,
+      "UserSelectionMode": "PeopleOnly",
+      "UserSelectionScope": 0,
+      "Description": "Person who submitted the ticket.",
+      "SchemaXml": "<Field Type=\"User\" DisplayName=\"Requester\" Required=\"FALSE\" UserSelectionMode=\"PeopleOnly\" UserSelectionScope=\"0\" ID=\"{a7b8c9d0-1e2f-3a4b-5c6d-7e8f9a0b1c2d}\" StaticName=\"Requester\" Name=\"Requester\" Description=\"Person who submitted the ticket.\" />"
+    },
+    {
+      "InternalName": "AssignedTo",
+      "DisplayName": "Assigned To",
+      "Type": "User",
+      "Required": false,
+      "UserSelectionMode": "PeopleOnly",
+      "UserSelectionScope": 0,
+      "Description": "Agent currently assigned to resolve this ticket.",
+      "SchemaXml": "<Field Type=\"User\" DisplayName=\"Assigned To\" Required=\"FALSE\" UserSelectionMode=\"PeopleOnly\" UserSelectionScope=\"0\" ID=\"{b8c9d0e1-2f3a-4b5c-6d7e-8f9a0b1c2d3e}\" StaticName=\"AssignedTo\" Name=\"AssignedTo\" Description=\"Agent currently assigned to resolve this ticket.\" />"
+    },
+    {
+      "InternalName": "SLADueDate",
+      "DisplayName": "SLA Due Date",
+      "Type": "DateTime",
+      "Required": false,
+      "Format": "DateTime",
+      "Description": "Target date/time by which this ticket must be resolved per SLA.",
+      "SchemaXml": "<Field Type=\"DateTime\" DisplayName=\"SLA Due Date\" Required=\"FALSE\" Format=\"DateTime\" ID=\"{c9d0e1f2-3a4b-5c6d-7e8f-9a0b1c2d3e4f}\" StaticName=\"SLADueDate\" Name=\"SLADueDate\" Description=\"Target date/time by which this ticket must be resolved per SLA.\" />"
+    },
+    {
+      "InternalName": "ResolutionNotes",
+      "DisplayName": "Resolution Notes",
+      "Type": "Note",
+      "Required": false,
+      "RichText": true,
+      "RichTextMode": "FullHtml",
+      "NumberOfLines": 6,
+      "AppendOnly": false,
+      "Description": "Notes describing how the issue was resolved.",
+      "SchemaXml": "<Field Type=\"Note\" DisplayName=\"Resolution Notes\" Required=\"FALSE\" RichText=\"TRUE\" RichTextMode=\"FullHtml\" NumLines=\"6\" AppendOnly=\"FALSE\" ID=\"{d0e1f2a3-4b5c-6d7e-8f9a-0b1c2d3e4f5a}\" StaticName=\"ResolutionNotes\" Name=\"ResolutionNotes\" Description=\"Notes describing how the issue was resolved.\" />"
+    },
+    {
+      "InternalName": "Source",
+      "DisplayName": "Source",
+      "Type": "Choice",
+      "Required": false,
+      "Format": "Dropdown",
+      "FillInChoice": false,
+      "Description": "Channel through which the ticket was submitted.",
+      "Choices": [
+        "Portal",
+        "Email",
+        "Teams",
+        "Phone"
+      ],
+      "SchemaXml": "<Field Type=\"Choice\" DisplayName=\"Source\" Required=\"FALSE\" Format=\"Dropdown\" FillInChoice=\"FALSE\" ID=\"{e1f2a3b4-5c6d-7e8f-9a0b-1c2d3e4f5a6b}\" StaticName=\"Source\" Name=\"Source\" Description=\"Channel through which the ticket was submitted.\"><Default></Default><CHOICES><CHOICE>Portal</CHOICE><CHOICE>Email</CHOICE><CHOICE>Teams</CHOICE><CHOICE>Phone</CHOICE></CHOICES></Field>"
+    },
+    {
+      "InternalName": "ResolutionDate",
+      "DisplayName": "Resolution Date",
+      "Type": "DateTime",
+      "Required": false,
+      "Format": "DateTime",
+      "Description": "Date and time the ticket was resolved.",
+      "SchemaXml": "<Field Type=\"DateTime\" DisplayName=\"Resolution Date\" Required=\"FALSE\" Format=\"DateTime\" ID=\"{f2a3b4c5-6d7e-8f9a-0b1c-2d3e4f5a6b7c}\" StaticName=\"ResolutionDate\" Name=\"ResolutionDate\" Description=\"Date and time the ticket was resolved.\" />"
+    },
+    {
+      "InternalName": "EscalationLevel",
+      "DisplayName": "Escalation Level",
+      "Type": "Number",
+      "Required": false,
+      "Min": 0,
+      "Max": 5,
+      "Decimals": 0,
+      "Default": 0,
+      "Description": "Current escalation tier (0 = not escalated, 1 = Tier 1 escalation, etc.).",
+      "SchemaXml": "<Field Type=\"Number\" DisplayName=\"Escalation Level\" Required=\"FALSE\" Min=\"0\" Max=\"5\" Decimals=\"0\" ID=\"{a3b4c5d6-7e8f-9a0b-1c2d-3e4f5a6b7c8d}\" StaticName=\"EscalationLevel\" Name=\"EscalationLevel\" Description=\"Current escalation tier (0 = not escalated, 1 = Tier 1 escalation, etc.).\"><Default>0</Default></Field>"
+    }
+  ],
+  "views": [
+    {
+      "viewName": "All Tickets",
+      "isDefault": true,
+      "rowLimit": 30,
+      "paged": true,
+      "query": "<OrderBy><FieldRef Name=\"Created\" Ascending=\"FALSE\" /></OrderBy>",
+      "viewFields": [
+        "TicketID",
+        "Title",
+        "Department",
+        "Category",
+        "Priority",
+        "Status",
+        "Requester",
+        "AssignedTo",
+        "SLADueDate",
+        "Source",
+        "Created"
+      ],
+      "schemaXml": "<View Name=\"AllTickets\" DefaultView=\"TRUE\" Type=\"HTML\" DisplayName=\"All Tickets\" Url=\"AllTickets.aspx\" Level=\"1\" BaseViewID=\"1\" ContentTypeID=\"0x\" ImageUrl=\"/_layouts/15/images/generic.png?rev=47\" ><Query><OrderBy><FieldRef Name=\"Created\" Ascending=\"FALSE\" /></OrderBy></Query><ViewFields><FieldRef Name=\"TicketID\" /><FieldRef Name=\"LinkTitle\" /><FieldRef Name=\"Department\" /><FieldRef Name=\"Category\" /><FieldRef Name=\"Priority\" /><FieldRef Name=\"Status\" /><FieldRef Name=\"Requester\" /><FieldRef Name=\"AssignedTo\" /><FieldRef Name=\"SLADueDate\" /><FieldRef Name=\"Source\" /><FieldRef Name=\"Created\" /></ViewFields><RowLimit Paged=\"TRUE\">30</RowLimit></View>"
+    },
+    {
+      "viewName": "My Tickets",
+      "isDefault": false,
+      "rowLimit": 30,
+      "paged": true,
+      "query": "<Where><Or><Eq><FieldRef Name=\"AssignedTo\" /><Value Type=\"Integer\"><UserID /></Value></Eq><Eq><FieldRef Name=\"Requester\" /><Value Type=\"Integer\"><UserID /></Value></Eq></Or></Where><OrderBy><FieldRef Name=\"Created\" Ascending=\"FALSE\" /></OrderBy>",
+      "viewFields": [
+        "TicketID",
+        "Title",
+        "Department",
+        "Category",
+        "Priority",
+        "Status",
+        "Requester",
+        "AssignedTo",
+        "SLADueDate",
+        "Created"
+      ],
+      "schemaXml": "<View Name=\"MyTickets\" DefaultView=\"FALSE\" Type=\"HTML\" DisplayName=\"My Tickets\" Url=\"MyTickets.aspx\" Level=\"1\" BaseViewID=\"2\" ContentTypeID=\"0x\" ImageUrl=\"/_layouts/15/images/generic.png?rev=47\" ><Query><Where><Or><Eq><FieldRef Name=\"AssignedTo\" /><Value Type=\"Integer\"><UserID /></Value></Eq><Eq><FieldRef Name=\"Requester\" /><Value Type=\"Integer\"><UserID /></Value></Eq></Or></Where><OrderBy><FieldRef Name=\"Created\" Ascending=\"FALSE\" /></OrderBy></Query><ViewFields><FieldRef Name=\"TicketID\" /><FieldRef Name=\"LinkTitle\" /><FieldRef Name=\"Department\" /><FieldRef Name=\"Category\" /><FieldRef Name=\"Priority\" /><FieldRef Name=\"Status\" /><FieldRef Name=\"Requester\" /><FieldRef Name=\"AssignedTo\" /><FieldRef Name=\"SLADueDate\" /><FieldRef Name=\"Created\" /></ViewFields><RowLimit Paged=\"TRUE\">30</RowLimit></View>"
+    },
+    {
+      "viewName": "Open Tickets",
+      "isDefault": false,
+      "rowLimit": 30,
+      "paged": true,
+      "query": "<Where><In><FieldRef Name=\"Status\" /><Values><Value Type=\"Choice\">New</Value><Value Type=\"Choice\">Assigned</Value><Value Type=\"Choice\">In Progress</Value><Value Type=\"Choice\">Pending Requester</Value></Values></In></Where><OrderBy><FieldRef Name=\"Priority\" Ascending=\"TRUE\" /><FieldRef Name=\"Created\" Ascending=\"TRUE\" /></OrderBy>",
+      "viewFields": [
+        "TicketID",
+        "Title",
+        "Department",
+        "Category",
+        "Priority",
+        "Status",
+        "Requester",
+        "AssignedTo",
+        "SLADueDate",
+        "EscalationLevel",
+        "Created"
+      ],
+      "schemaXml": "<View Name=\"OpenTickets\" DefaultView=\"FALSE\" Type=\"HTML\" DisplayName=\"Open Tickets\" Url=\"OpenTickets.aspx\" Level=\"1\" BaseViewID=\"3\" ContentTypeID=\"0x\" ImageUrl=\"/_layouts/15/images/generic.png?rev=47\" ><Query><Where><In><FieldRef Name=\"Status\" /><Values><Value Type=\"Choice\">New</Value><Value Type=\"Choice\">Assigned</Value><Value Type=\"Choice\">In Progress</Value><Value Type=\"Choice\">Pending Requester</Value></Values></In></Where><OrderBy><FieldRef Name=\"Priority\" Ascending=\"TRUE\" /><FieldRef Name=\"Created\" Ascending=\"TRUE\" /></OrderBy></Query><ViewFields><FieldRef Name=\"TicketID\" /><FieldRef Name=\"LinkTitle\" /><FieldRef Name=\"Department\" /><FieldRef Name=\"Category\" /><FieldRef Name=\"Priority\" /><FieldRef Name=\"Status\" /><FieldRef Name=\"Requester\" /><FieldRef Name=\"AssignedTo\" /><FieldRef Name=\"SLADueDate\" /><FieldRef Name=\"EscalationLevel\" /><FieldRef Name=\"Created\" /></ViewFields><RowLimit Paged=\"TRUE\">30</RowLimit></View>"
+    },
+    {
+      "viewName": "Overdue Tickets",
+      "isDefault": false,
+      "rowLimit": 30,
+      "paged": true,
+      "query": "<Where><And><In><FieldRef Name=\"Status\" /><Values><Value Type=\"Choice\">New</Value><Value Type=\"Choice\">Assigned</Value><Value Type=\"Choice\">In Progress</Value><Value Type=\"Choice\">Pending Requester</Value></Values></In><Lt><FieldRef Name=\"SLADueDate\" /><Value Type=\"DateTime\"><Today /></Value></Lt></And></Where><OrderBy><FieldRef Name=\"SLADueDate\" Ascending=\"TRUE\" /></OrderBy>",
+      "viewFields": [
+        "TicketID",
+        "Title",
+        "Department",
+        "Category",
+        "Priority",
+        "Status",
+        "Requester",
+        "AssignedTo",
+        "SLADueDate",
+        "EscalationLevel",
+        "Created"
+      ],
+      "schemaXml": "<View Name=\"OverdueTickets\" DefaultView=\"FALSE\" Type=\"HTML\" DisplayName=\"Overdue Tickets\" Url=\"OverdueTickets.aspx\" Level=\"1\" BaseViewID=\"4\" ContentTypeID=\"0x\" ImageUrl=\"/_layouts/15/images/generic.png?rev=47\" ><Query><Where><And><In><FieldRef Name=\"Status\" /><Values><Value Type=\"Choice\">New</Value><Value Type=\"Choice\">Assigned</Value><Value Type=\"Choice\">In Progress</Value><Value Type=\"Choice\">Pending Requester</Value></Values></In><Lt><FieldRef Name=\"SLADueDate\" /><Value Type=\"DateTime\"><Today /></Value></Lt></And></Where><OrderBy><FieldRef Name=\"SLADueDate\" Ascending=\"TRUE\" /></OrderBy></Query><ViewFields><FieldRef Name=\"TicketID\" /><FieldRef Name=\"LinkTitle\" /><FieldRef Name=\"Department\" /><FieldRef Name=\"Category\" /><FieldRef Name=\"Priority\" /><FieldRef Name=\"Status\" /><FieldRef Name=\"Requester\" /><FieldRef Name=\"AssignedTo\" /><FieldRef Name=\"SLADueDate\" /><FieldRef Name=\"EscalationLevel\" /><FieldRef Name=\"Created\" /></ViewFields><RowLimit Paged=\"TRUE\">30</RowLimit></View>"
+    }
+  ],
+  "contentTypes": [
+    {
+      "id": "0x0100A1B2C3D4E5F6A7B8C9D0E1F2A3B4",
+      "name": "Service Desk Ticket",
+      "description": "Content type for service desk tickets.",
+      "group": "Service Desk Content Types"
+    }
+  ]
+}

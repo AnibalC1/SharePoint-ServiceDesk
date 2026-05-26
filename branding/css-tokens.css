@@ -1,0 +1,309 @@
+/* ===========================================================================
+   Service Desk -- CSS Design Tokens
+   ===========================================================================
+   Import this file in SPFx web parts, SharePoint custom CSS, or any
+   component that needs consistent access to the Service Desk design system.
+
+   Usage:
+     @import url('/sites/ServiceDesk/SiteAssets/css-tokens.css');
+     .my-element { color: var(--sd-color-primary); }
+
+   All tokens are prefixed with --sd- to avoid collisions with SharePoint
+   framework tokens or third-party libraries.
+   =========================================================================== */
+
+:root {
+  /* -----------------------------------------------------------------------
+     1. PRIMARY PALETTE
+     ----------------------------------------------------------------------- */
+  --sd-color-primary:             #0078D4;
+  --sd-color-primary-dark:        #106EBE;
+  --sd-color-primary-darker:      #005A9E;
+  --sd-color-primary-darkest:     #004578;
+  --sd-color-primary-light:       #C7E0F4;
+  --sd-color-primary-lighter:     #DEECF9;
+  --sd-color-primary-lightest:    #EFF6FC;
+
+  /* -----------------------------------------------------------------------
+     2. ACCENT / TEAL
+     ----------------------------------------------------------------------- */
+  --sd-color-accent:              #038387;
+  --sd-color-accent-light:        #4BB4B7;
+  --sd-color-accent-dark:         #006E6E;
+
+  /* -----------------------------------------------------------------------
+     3. SEMANTIC COLORS
+     ----------------------------------------------------------------------- */
+  --sd-color-error:               #A4262C;
+  --sd-color-error-bg:            #FDE7E9;
+  --sd-color-error-hover:         #8C2025;
+  --sd-color-warning:             #FFB900;
+  --sd-color-warning-bg:          #FFF4CE;
+  --sd-color-success:             #107C10;
+  --sd-color-success-bg:          #DFF6DD;
+  --sd-color-info:                #0078D4;
+  --sd-color-info-bg:             #EFF6FC;
+
+  /* -----------------------------------------------------------------------
+     4. NEUTRAL PALETTE
+     ----------------------------------------------------------------------- */
+  --sd-color-black:               #000000;
+  --sd-color-neutral-dark:        #201F1E;
+  --sd-color-neutral-primary:     #323130;
+  --sd-color-neutral-primary-alt: #3B3A39;
+  --sd-color-neutral-secondary:   #605E5C;
+  --sd-color-neutral-secondary-alt: #8A8886;
+  --sd-color-neutral-tertiary:    #A19F9D;
+  --sd-color-neutral-tertiary-alt: #C8C6C4;
+  --sd-color-neutral-quaternary:  #D2D0CE;
+  --sd-color-neutral-quaternary-alt: #E1DFDD;
+  --sd-color-neutral-light:       #EDEBE9;
+  --sd-color-neutral-lighter:     #F3F2F1;
+  --sd-color-neutral-lightest-alt: #FAF9F8;
+  --sd-color-white:               #FFFFFF;
+
+  /* -----------------------------------------------------------------------
+     5. TEXT COLORS
+     ----------------------------------------------------------------------- */
+  --sd-color-text-primary:        #323130;
+  --sd-color-text-secondary:      #605E5C;
+  --sd-color-text-disabled:       #A19F9D;
+  --sd-color-text-inverse:        #FFFFFF;
+  --sd-color-text-link:           #0078D4;
+  --sd-color-text-link-hover:     #004578;
+  --sd-color-text-error:          #A4262C;
+  --sd-color-text-success:        #107C10;
+  --sd-color-text-warning:        #323130;
+
+  /* -----------------------------------------------------------------------
+     6. BACKGROUND COLORS
+     ----------------------------------------------------------------------- */
+  --sd-color-bg-page:             #FAF9F8;
+  --sd-color-bg-surface:          #FFFFFF;
+  --sd-color-bg-elevated:         #FFFFFF;
+  --sd-color-bg-subtle:           #F3F2F1;
+  --sd-color-bg-selected:         #EFF6FC;
+  --sd-color-bg-hover:            #F3F2F1;
+  --sd-color-bg-pressed:          #EDEBE9;
+  --sd-color-bg-disabled:         #F3F2F1;
+
+  /* -----------------------------------------------------------------------
+     7. BORDER COLORS
+     ----------------------------------------------------------------------- */
+  --sd-color-border-default:      #EDEBE9;
+  --sd-color-border-strong:       #8A8886;
+  --sd-color-border-subtle:       #E1DFDD;
+  --sd-color-border-focus:        #0078D4;
+  --sd-color-border-error:        #A4262C;
+  --sd-color-border-success:      #107C10;
+  --sd-color-border-disabled:     #C8C6C4;
+
+  /* -----------------------------------------------------------------------
+     8. PRIORITY COLORS
+     ----------------------------------------------------------------------- */
+  --sd-color-priority-critical-bg:   #A4262C;
+  --sd-color-priority-critical-text: #FFFFFF;
+  --sd-color-priority-high-bg:       #D83B01;
+  --sd-color-priority-high-text:     #FFFFFF;
+  --sd-color-priority-medium-bg:     #0078D4;
+  --sd-color-priority-medium-text:   #FFFFFF;
+  --sd-color-priority-low-bg:        #F3F2F1;
+  --sd-color-priority-low-text:      #323130;
+
+  /* -----------------------------------------------------------------------
+     9. STATUS COLORS
+     ----------------------------------------------------------------------- */
+  --sd-color-status-new-bg:              #0078D4;
+  --sd-color-status-new-text:            #FFFFFF;
+  --sd-color-status-assigned-bg:         #038387;
+  --sd-color-status-assigned-text:       #FFFFFF;
+  --sd-color-status-inprogress-bg:       #CA5010;
+  --sd-color-status-inprogress-text:     #FFFFFF;
+  --sd-color-status-pending-bg:          #FFB900;
+  --sd-color-status-pending-text:        #323130;
+  --sd-color-status-resolved-bg:         #107C10;
+  --sd-color-status-resolved-text:       #FFFFFF;
+  --sd-color-status-closed-bg:           #605E5C;
+  --sd-color-status-closed-text:         #FFFFFF;
+
+  /* -----------------------------------------------------------------------
+     10. TYPOGRAPHY
+     ----------------------------------------------------------------------- */
+  --sd-font-family:               "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+  --sd-font-family-mono:          "Cascadia Code", "Fira Code", Consolas, "Courier New", monospace;
+
+  --sd-font-size-hero:            28px;
+  --sd-font-size-xxl:             24px;
+  --sd-font-size-xl:              20px;
+  --sd-font-size-l:               16px;
+  --sd-font-size-m:               14px;
+  --sd-font-size-s:               12px;
+  --sd-font-size-xs:              10px;
+
+  --sd-font-weight-regular:       400;
+  --sd-font-weight-semibold:      600;
+  --sd-font-weight-bold:          700;
+
+  --sd-line-height-hero:          36px;
+  --sd-line-height-xxl:           32px;
+  --sd-line-height-xl:            28px;
+  --sd-line-height-l:             24px;
+  --sd-line-height-m:             20px;
+  --sd-line-height-s:             16px;
+  --sd-line-height-xs:            14px;
+
+  /* -----------------------------------------------------------------------
+     11. SPACING (4px base unit)
+     ----------------------------------------------------------------------- */
+  --sd-spacing-xxs:               2px;
+  --sd-spacing-xs:                4px;
+  --sd-spacing-s:                 8px;
+  --sd-spacing-m:                 12px;
+  --sd-spacing-l:                 16px;
+  --sd-spacing-xl:                20px;
+  --sd-spacing-xxl:               24px;
+  --sd-spacing-xxxl:              32px;
+  --sd-spacing-jumbo:             48px;
+
+  /* -----------------------------------------------------------------------
+     12. BORDER RADIUS
+     ----------------------------------------------------------------------- */
+  --sd-radius-none:               0;
+  --sd-radius-xs:                 2px;
+  --sd-radius-s:                  4px;
+  --sd-radius-m:                  8px;
+  --sd-radius-l:                  12px;
+  --sd-radius-pill:               16px;
+  --sd-radius-circle:             50%;
+
+  /* -----------------------------------------------------------------------
+     13. SHADOWS
+     ----------------------------------------------------------------------- */
+  --sd-shadow-none:               none;
+  --sd-shadow-xs:                 0 1px 2px rgba(0, 0, 0, 0.08);
+  --sd-shadow-s:                  0 1.6px 3.6px rgba(0, 0, 0, 0.13),
+                                  0 0.3px 0.9px rgba(0, 0, 0, 0.11);
+  --sd-shadow-m:                  0 3.2px 7.2px rgba(0, 0, 0, 0.13),
+                                  0 0.6px 1.8px rgba(0, 0, 0, 0.11);
+  --sd-shadow-l:                  0 6.4px 14.4px rgba(0, 0, 0, 0.13),
+                                  0 1.2px 3.6px rgba(0, 0, 0, 0.11);
+  --sd-shadow-xl:                 0 12.8px 28.8px rgba(0, 0, 0, 0.13),
+                                  0 2.4px 7.2px rgba(0, 0, 0, 0.11);
+
+  /* -----------------------------------------------------------------------
+     14. TRANSITIONS
+     ----------------------------------------------------------------------- */
+  --sd-transition-fast:           150ms ease;
+  --sd-transition-normal:         200ms ease;
+  --sd-transition-slow:           300ms ease-in-out;
+  --sd-transition-slide:          300ms cubic-bezier(0.1, 0.9, 0.2, 1);
+
+  /* -----------------------------------------------------------------------
+     15. Z-INDEX SCALE
+     ----------------------------------------------------------------------- */
+  --sd-z-base:                    0;
+  --sd-z-dropdown:                100;
+  --sd-z-sticky:                  200;
+  --sd-z-overlay:                 400;
+  --sd-z-modal:                   600;
+  --sd-z-popover:                 800;
+  --sd-z-toast:                   1000;
+
+  /* -----------------------------------------------------------------------
+     16. LAYOUT
+     ----------------------------------------------------------------------- */
+  --sd-breakpoint-xs:             0px;
+  --sd-breakpoint-s:              480px;
+  --sd-breakpoint-m:              640px;
+  --sd-breakpoint-l:              1024px;
+  --sd-breakpoint-xl:             1366px;
+  --sd-breakpoint-xxl:            1920px;
+
+  --sd-max-width-content:         1200px;
+  --sd-max-width-form:            640px;
+  --sd-max-width-card:            400px;
+
+  /* -----------------------------------------------------------------------
+     17. COMPONENT-SPECIFIC TOKENS
+     ----------------------------------------------------------------------- */
+
+  /* Buttons */
+  --sd-button-height:             32px;
+  --sd-button-height-compact:     28px;
+  --sd-button-height-large:       40px;
+  --sd-button-padding:            6px 20px;
+  --sd-button-radius:             var(--sd-radius-s);
+  --sd-button-font-size:          var(--sd-font-size-m);
+  --sd-button-font-weight:        var(--sd-font-weight-semibold);
+
+  /* Inputs */
+  --sd-input-height:              32px;
+  --sd-input-padding:             6px 12px;
+  --sd-input-radius:              var(--sd-radius-s);
+  --sd-input-border:              1px solid var(--sd-color-border-strong);
+  --sd-input-font-size:           var(--sd-font-size-m);
+
+  /* Cards */
+  --sd-card-padding:              var(--sd-spacing-l);
+  --sd-card-radius:               var(--sd-radius-m);
+  --sd-card-shadow:               var(--sd-shadow-s);
+  --sd-card-shadow-hover:         var(--sd-shadow-m);
+  --sd-card-border:               1px solid var(--sd-color-border-default);
+  --sd-card-bg:                   var(--sd-color-bg-surface);
+
+  /* Badges / Pills */
+  --sd-badge-padding:             4px 16px;
+  --sd-badge-radius:              var(--sd-radius-pill);
+  --sd-badge-font-size:           var(--sd-font-size-s);
+  --sd-badge-font-weight:         var(--sd-font-weight-semibold);
+  --sd-badge-min-width:           70px;
+
+  /* Table */
+  --sd-table-header-bg:           var(--sd-color-neutral-lightest-alt);
+  --sd-table-header-text:         var(--sd-color-text-secondary);
+  --sd-table-header-font-size:    var(--sd-font-size-s);
+  --sd-table-header-font-weight:  var(--sd-font-weight-semibold);
+  --sd-table-row-bg:              var(--sd-color-bg-surface);
+  --sd-table-row-alt-bg:          var(--sd-color-neutral-lightest-alt);
+  --sd-table-row-hover-bg:        var(--sd-color-bg-hover);
+  --sd-table-row-selected-bg:     var(--sd-color-bg-selected);
+  --sd-table-cell-padding:        8px 12px;
+  --sd-table-border:              1px solid var(--sd-color-border-default);
+
+  /* Avatar */
+  --sd-avatar-size-xs:            24px;
+  --sd-avatar-size-s:             32px;
+  --sd-avatar-size-m:             40px;
+  --sd-avatar-size-l:             48px;
+}
+
+/* ===========================================================================
+   Reduced Motion Preference
+   =========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --sd-transition-fast:         0ms;
+    --sd-transition-normal:       0ms;
+    --sd-transition-slow:         0ms;
+    --sd-transition-slide:        0ms;
+  }
+}
+
+/* ===========================================================================
+   Dark Mode Overrides (if supported in future)
+   =========================================================================== */
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Placeholder: dark mode tokens can be defined here when needed.
+       SharePoint Online does not currently support dark mode site themes,
+       but these tokens prepare the system for future compatibility.
+
+    --sd-color-bg-page:           #1B1A19;
+    --sd-color-bg-surface:        #252423;
+    --sd-color-bg-elevated:       #323130;
+    --sd-color-text-primary:      #F3F2F1;
+    --sd-color-text-secondary:    #C8C6C4;
+    --sd-color-border-default:    #3B3A39;
+    */
+  }
+}

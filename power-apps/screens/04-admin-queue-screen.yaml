@@ -1,0 +1,920 @@
+# ==============================================================================
+# Service Desk - Admin / Agent Queue Screen
+# Power Apps Canvas App (YAML Code-First Format)
+# ==============================================================================
+# Agent-facing queue with "My Queue" / "All Tickets" toggle, bulk actions,
+# sortable columns, agent workload cards, and quick-assign per ticket.
+# Data source: SharePoint list "ServiceDeskTickets"
+# ==============================================================================
+
+Screen:
+  Name: scrAdminQueue
+  Fill: =RGBA(250, 249, 248, 1)
+
+  OnVisible: |
+    =Set(varLoadingQueue, true);
+
+    // Default to "My Queue"
+    Set(varQueueMode, "My Queue");
+    Set(varQueueSortField, "SLADueDate");
+    Set(varQueueSortOrder, SortOrder.Ascending);
+    Set(varBulkSelectMode, false);
+
+    // Clear bulk selection
+    ClearCollect(colBulkSelected, Blank());
+    Clear(colBulkSelected);
+
+    // Load agent workload summary
+    ClearCollect(
+        colAgentWorkload,
+        AddColumns(
+            GroupBy(
+                Filter(
+                    ServiceDeskTickets,
+                    !IsBlank(AssignedTo)
+                    && Status <> "Closed"
+                    && Status <> "Resolved"
+                ),
+                "AssignedTo",
+                "AgentTickets"
+            ),
+            "TicketCount", CountRows(AgentTickets),
+            "OverdueCount", CountIf(AgentTickets, SLADueDate < Now()),
+            "CriticalCount", CountIf(AgentTickets, Priority = "Critical" || Priority = "High")
+        )
+    );
+
+    // Build quick-assign agent list
+    ClearCollect(
+        colAgentList,
+        ShowColumns(
+            ServiceDeskAgents,
+            "DisplayName", "Email", "Department"
+        )
+    );
+
+    Set(varLoadingQueue, false);
+
+  Children:
+
+    # ==========================================================================
+    # TOP BAR
+    # ==========================================================================
+    - Container:
+        Name: conQueueTopBar
+        LayoutDirection: Horizontal
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: 56
+        Fill: =RGBA(0, 120, 212, 1)
+        PaddingLeft: 12
+        PaddingRight: 20
+
+        Children:
+          - Button:
+              Name: btnQueueBack
+              Text: ""
+              Icon: =Icon.BackArrow
+              X: 8
+              Y: 8
+              Width: 40
+              Height: 40
+              Fill: =RGBA(0, 0, 0, 0)
+              Color: =RGBA(255, 255, 255, 1)
+              HoverFill: =RGBA(255, 255, 255, 0.15)
+              BorderStyle: =BorderStyle.None
+              OnSelect: =Navigate(scrDashboard, ScreenTransition.Fade)
+
+          - Label:
+              Name: lblQueueTitle
+              Text: ="Ticket Queue"
+              X: 56
+              Y: 0
+              Width: 200
+              Height: =Parent.Height
+              Font: =Font.'Segoe UI'
+              Size: 20
+              FontWeight: =FontWeight.Bold
+              Color: =RGBA(255, 255, 255, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+    # ==========================================================================
+    # AGENT WORKLOAD SUMMARY CARDS
+    # ==========================================================================
+    - Container:
+        Name: conWorkloadRow
+        LayoutDirection: Horizontal
+        X: 20
+        Y: 72
+        Width: =Parent.Width - 40
+        Height: 80
+        Gap: 12
+
+        Children:
+          - Gallery:
+              Name: galWorkloadCards
+              TemplateSize: 200
+              TemplatePadding: 6
+              X: 0
+              Y: 0
+              Width: =Parent.Width
+              Height: =Parent.Height
+              Direction: =Layout.Horizontal
+              Items: |
+                =FirstN(
+                    SortByColumns(colAgentWorkload, "TicketCount", SortOrder.Descending),
+                    6
+                )
+
+              TemplateChildren:
+                - Container:
+                    Name: conWorkloadCard
+                    Width: 188
+                    Height: 72
+                    Fill: =RGBA(255, 255, 255, 1)
+                    RadiusTopLeft: 6
+                    RadiusTopRight: 6
+                    RadiusBottomLeft: 6
+                    RadiusBottomRight: 6
+                    DropShadow: =DropShadow.Light
+                    PaddingLeft: 12
+                    PaddingRight: 12
+                    PaddingTop: 8
+                    PaddingBottom: 8
+
+                    Children:
+                      - Label:
+                          Name: lblWorkloadAgent
+                          Text: =ThisItem.AssignedTo.DisplayName
+                          Width: 164
+                          Height: 22
+                          Font: =Font.'Segoe UI'
+                          Size: 12
+                          FontWeight: =FontWeight.Semibold
+                          Color: =RGBA(50, 49, 48, 1)
+                          Overflow: =Overflow.Hidden
+
+                      - Label:
+                          Name: lblWorkloadStats
+                          Text: |
+                            =Text(ThisItem.TicketCount) & " active"
+                            & If(
+                                ThisItem.OverdueCount > 0,
+                                "  ·  " & Text(ThisItem.OverdueCount) & " overdue",
+                                ""
+                            )
+                          Y: 24
+                          Width: 164
+                          Height: 18
+                          Font: =Font.'Segoe UI'
+                          Size: 11
+                          Color: |
+                            =If(
+                                ThisItem.OverdueCount > 0,
+                                RGBA(216, 59, 1, 1),
+                                RGBA(96, 94, 92, 1)
+                            )
+
+                      - Label:
+                          Name: lblWorkloadCritical
+                          Text: |
+                            =If(
+                                ThisItem.CriticalCount > 0,
+                                Text(ThisItem.CriticalCount) & " high/critical",
+                                "No urgent"
+                            )
+                          Y: 44
+                          Width: 164
+                          Height: 18
+                          Font: =Font.'Segoe UI'
+                          Size: 10
+                          Color: |
+                            =If(
+                                ThisItem.CriticalCount > 0,
+                                RGBA(164, 38, 44, 1),
+                                RGBA(96, 94, 92, 1)
+                            )
+
+    # ==========================================================================
+    # QUEUE CONTROLS — Toggle, Sort, Bulk Actions
+    # ==========================================================================
+    - Container:
+        Name: conQueueControls
+        LayoutDirection: Horizontal
+        X: 20
+        Y: 168
+        Width: =Parent.Width - 40
+        Height: 52
+        Fill: =RGBA(255, 255, 255, 1)
+        RadiusTopLeft: 8
+        RadiusTopRight: 8
+        RadiusBottomLeft: 8
+        RadiusBottomRight: 8
+        DropShadow: =DropShadow.Light
+        PaddingLeft: 16
+        PaddingRight: 16
+        Gap: 16
+        AlignItems: =LayoutAlignItems.Center
+
+        Children:
+          # ---- My Queue / All Tickets toggle ----
+          - Container:
+              Name: conQueueToggle
+              LayoutDirection: Horizontal
+              Width: 260
+              Height: 36
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+
+              Children:
+                - Button:
+                    Name: btnMyQueue
+                    Text: ="My Queue"
+                    Width: 130
+                    Height: 36
+                    Fill: |
+                      =If(
+                          varQueueMode = "My Queue",
+                          RGBA(0, 120, 212, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    Color: |
+                      =If(
+                          varQueueMode = "My Queue",
+                          RGBA(255, 255, 255, 1),
+                          RGBA(50, 49, 48, 1)
+                      )
+                    HoverFill: |
+                      =If(
+                          varQueueMode = "My Queue",
+                          RGBA(16, 110, 190, 1),
+                          RGBA(0, 120, 212, 0.08)
+                      )
+                    BorderStyle: =BorderStyle.Solid
+                    BorderColor: =RGBA(0, 120, 212, 1)
+                    BorderThickness: 1
+                    RadiusTopLeft: 4
+                    RadiusTopRight: 0
+                    RadiusBottomLeft: 4
+                    RadiusBottomRight: 0
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    OnSelect: =Set(varQueueMode, "My Queue")
+
+                - Button:
+                    Name: btnAllTickets
+                    Text: ="All Tickets"
+                    Width: 130
+                    Height: 36
+                    Fill: |
+                      =If(
+                          varQueueMode = "All Tickets",
+                          RGBA(0, 120, 212, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    Color: |
+                      =If(
+                          varQueueMode = "All Tickets",
+                          RGBA(255, 255, 255, 1),
+                          RGBA(50, 49, 48, 1)
+                      )
+                    HoverFill: |
+                      =If(
+                          varQueueMode = "All Tickets",
+                          RGBA(16, 110, 190, 1),
+                          RGBA(0, 120, 212, 0.08)
+                      )
+                    BorderStyle: =BorderStyle.Solid
+                    BorderColor: =RGBA(0, 120, 212, 1)
+                    BorderThickness: 1
+                    RadiusTopLeft: 0
+                    RadiusTopRight: 4
+                    RadiusBottomLeft: 0
+                    RadiusBottomRight: 4
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    FontWeight: =FontWeight.Semibold
+                    OnSelect: =Set(varQueueMode, "All Tickets")
+
+          # ---- Sort By controls ----
+          - Label:
+              Name: lblSortBy
+              Text: ="Sort by:"
+              Width: 50
+              Height: 36
+              Font: =Font.'Segoe UI'
+              Size: 12
+              Color: =RGBA(96, 94, 92, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+          - Dropdown:
+              Name: ddlSortField
+              Items: |
+                =Table(
+                    { Value: "SLA Due",   Field: "SLADueDate" },
+                    { Value: "Priority",  Field: "Priority" },
+                    { Value: "Created",   Field: "Created" },
+                    { Value: "Status",    Field: "Status" }
+                )
+              Default: ="SLA Due"
+              Width: 130
+              Height: 36
+              Font: =Font.'Segoe UI'
+              Size: 13
+              BorderColor: =RGBA(210, 208, 206, 1)
+              OnChange: =Set(varQueueSortField, Self.Selected.Field)
+
+          - Button:
+              Name: btnSortToggle
+              Text: |
+                =If(
+                    varQueueSortOrder = SortOrder.Ascending,
+                    "ASC",
+                    "DESC"
+                )
+              Width: 56
+              Height: 36
+              Fill: =RGBA(0, 0, 0, 0)
+              Color: =RGBA(0, 120, 212, 1)
+              HoverFill: =RGBA(0, 120, 212, 0.08)
+              BorderStyle: =BorderStyle.Solid
+              BorderColor: =RGBA(210, 208, 206, 1)
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+              Font: =Font.'Segoe UI'
+              Size: 12
+              FontWeight: =FontWeight.Semibold
+              OnSelect: |
+                =Set(
+                    varQueueSortOrder,
+                    If(
+                        varQueueSortOrder = SortOrder.Ascending,
+                        SortOrder.Descending,
+                        SortOrder.Ascending
+                    )
+                )
+
+          # ---- Bulk action toggle ----
+          - Button:
+              Name: btnBulkToggle
+              Text: |
+                =If(
+                    varBulkSelectMode,
+                    "Cancel Selection",
+                    "Bulk Actions"
+                )
+              Width: 140
+              Height: 36
+              Fill: =RGBA(0, 0, 0, 0)
+              Color: |
+                =If(
+                    varBulkSelectMode,
+                    RGBA(216, 59, 1, 1),
+                    RGBA(0, 120, 212, 1)
+                )
+              HoverFill: =RGBA(0, 120, 212, 0.08)
+              BorderStyle: =BorderStyle.Solid
+              BorderColor: |
+                =If(
+                    varBulkSelectMode,
+                    RGBA(216, 59, 1, 1),
+                    RGBA(210, 208, 206, 1)
+                )
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              OnSelect: |
+                =Set(varBulkSelectMode, !varBulkSelectMode);
+                If(!varBulkSelectMode, Clear(colBulkSelected));
+
+    # ==========================================================================
+    # BULK ACTIONS BAR (visible when bulk mode is on and items are selected)
+    # ==========================================================================
+    - Container:
+        Name: conBulkBar
+        Visible: =varBulkSelectMode && CountRows(colBulkSelected) > 0
+        LayoutDirection: Horizontal
+        X: 20
+        Y: 228
+        Width: =Parent.Width - 40
+        Height: 48
+        Fill: =RGBA(0, 120, 212, 0.08)
+        RadiusTopLeft: 6
+        RadiusTopRight: 6
+        RadiusBottomLeft: 6
+        RadiusBottomRight: 6
+        PaddingLeft: 16
+        PaddingRight: 16
+        Gap: 12
+        AlignItems: =LayoutAlignItems.Center
+
+        Children:
+          - Label:
+              Name: lblBulkCount
+              Text: =Text(CountRows(colBulkSelected)) & " selected"
+              Width: 100
+              Height: 36
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(0, 120, 212, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+          # Bulk Assign
+          - Dropdown:
+              Name: ddlBulkAssign
+              Items: =colAgentList.DisplayName
+              Width: 180
+              Height: 36
+              Font: =Font.'Segoe UI'
+              Size: 13
+              BorderColor: =RGBA(210, 208, 206, 1)
+
+          - Button:
+              Name: btnBulkAssign
+              Text: ="Assign"
+              Width: 80
+              Height: 36
+              Fill: =RGBA(0, 120, 212, 1)
+              Color: =RGBA(255, 255, 255, 1)
+              HoverFill: =RGBA(16, 110, 190, 1)
+              BorderStyle: =BorderStyle.None
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              OnSelect: |
+                =// Bulk assign selected tickets
+                Set(varBulkProcessing, true);
+
+                With(
+                    {
+                        selectedAgent: LookUp(
+                            colAgentList,
+                            DisplayName = ddlBulkAssign.Selected.Value
+                        )
+                    },
+                    ForAll(
+                        colBulkSelected,
+                        Patch(
+                            ServiceDeskTickets,
+                            LookUp(ServiceDeskTickets, ID = ThisRecord.ID),
+                            {
+                                AssignedTo: {
+                                    '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                    Claims: "i:0#.f|membership|" & Lower(selectedAgent.Email),
+                                    DisplayName: selectedAgent.DisplayName,
+                                    Email: selectedAgent.Email
+                                },
+                                Status: If(
+                                    ThisRecord.Status = "New",
+                                    "Assigned",
+                                    ThisRecord.Status
+                                )
+                            }
+                        )
+                    )
+                );
+
+                Clear(colBulkSelected);
+                Set(varBulkSelectMode, false);
+                Set(varBulkProcessing, false);
+                Notify(
+                    "Tickets assigned to " & ddlBulkAssign.Selected.Value,
+                    NotificationType.Success,
+                    2000
+                );
+
+          # Bulk Status Change
+          - Dropdown:
+              Name: ddlBulkStatus
+              Items: =["Assigned", "In Progress", "Pending Requester", "Resolved", "Closed"]
+              Width: 160
+              Height: 36
+              Font: =Font.'Segoe UI'
+              Size: 13
+              BorderColor: =RGBA(210, 208, 206, 1)
+
+          - Button:
+              Name: btnBulkChangeStatus
+              Text: ="Set Status"
+              Width: 96
+              Height: 36
+              Fill: =RGBA(3, 131, 135, 1)
+              Color: =RGBA(255, 255, 255, 1)
+              HoverFill: =RGBA(2, 110, 113, 1)
+              BorderStyle: =BorderStyle.None
+              RadiusTopLeft: 4
+              RadiusTopRight: 4
+              RadiusBottomLeft: 4
+              RadiusBottomRight: 4
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              OnSelect: |
+                =Set(varBulkProcessing, true);
+
+                ForAll(
+                    colBulkSelected,
+                    Patch(
+                        ServiceDeskTickets,
+                        LookUp(ServiceDeskTickets, ID = ThisRecord.ID),
+                        {
+                            Status: ddlBulkStatus.Selected.Value,
+                            ResolvedDate: If(
+                                ddlBulkStatus.Selected.Value = "Resolved",
+                                Now(),
+                                Blank()
+                            ),
+                            ClosedDate: If(
+                                ddlBulkStatus.Selected.Value = "Closed",
+                                Now(),
+                                Blank()
+                            )
+                        }
+                    )
+                );
+
+                Clear(colBulkSelected);
+                Set(varBulkSelectMode, false);
+                Set(varBulkProcessing, false);
+                Notify(
+                    "Status updated for selected tickets.",
+                    NotificationType.Success,
+                    2000
+                );
+
+    # ==========================================================================
+    # QUEUE TICKET LIST
+    # ==========================================================================
+    - Gallery:
+        Name: galQueueList
+        TemplateSize: 76
+        TemplatePadding: 4
+        X: 20
+        Y: |
+          =If(
+              varBulkSelectMode && CountRows(colBulkSelected) > 0,
+              290,
+              236
+          )
+        Width: =Parent.Width - 40
+        Height: |
+          =Parent.Height - If(
+              varBulkSelectMode && CountRows(colBulkSelected) > 0,
+              310,
+              256
+          )
+        ShowScrollbar: true
+        LoadingSpinner: =LoadingSpinner.Data
+
+        # ====================================================================
+        # ITEMS — Filtered by queue mode, sorted by selected field
+        # ====================================================================
+        Items: |
+          =With(
+              {
+                  baseQuery:
+                      If(
+                          varQueueMode = "My Queue",
+                          // My Queue: tickets assigned to current user
+                          Filter(
+                              ServiceDeskTickets,
+                              Lower(AssignedTo.Email) = Lower(User().Email)
+                              && Status <> "Closed"
+                          ),
+                          // All Tickets: all non-closed tickets
+                          Filter(
+                              ServiceDeskTickets,
+                              Status <> "Closed"
+                          )
+                      )
+              },
+              SortByColumns(
+                  baseQuery,
+                  varQueueSortField,
+                  varQueueSortOrder
+              )
+          )
+
+        TemplateChildren:
+          - Container:
+              Name: conQueueRow
+              Width: =Parent.TemplateWidth - 8
+              Height: 68
+              X: 4
+              Y: 4
+              Fill: |
+                =If(
+                    ThisItem.ID in colBulkSelected.ID,
+                    RGBA(0, 120, 212, 0.06),
+                    RGBA(255, 255, 255, 1)
+                )
+              RadiusTopLeft: 6
+              RadiusTopRight: 6
+              RadiusBottomLeft: 6
+              RadiusBottomRight: 6
+              DropShadow: =DropShadow.Light
+              PaddingLeft: 12
+              PaddingRight: 12
+
+              Children:
+                # ---- Bulk select checkbox ----
+                - Checkbox:
+                    Name: chkBulkSelect
+                    Visible: =varBulkSelectMode
+                    X: 0
+                    Y: 20
+                    Width: 28
+                    Height: 28
+                    Default: =ThisItem.ID in colBulkSelected.ID
+                    OnCheck: |
+                      =Collect(
+                          colBulkSelected,
+                          { ID: ThisItem.ID, Status: ThisItem.Status }
+                      )
+                    OnUncheck: |
+                      =Remove(
+                          colBulkSelected,
+                          LookUp(colBulkSelected, ID = ThisItem.ID)
+                      )
+                    BorderColor: =RGBA(0, 120, 212, 1)
+                    CheckmarkFill: =RGBA(0, 120, 212, 1)
+
+                # ---- Ticket ID monospace ----
+                - Label:
+                    Name: lblQueueTicketID
+                    Text: =ThisItem.TicketID
+                    X: =If(varBulkSelectMode, 36, 4)
+                    Y: 10
+                    Width: 110
+                    Height: 20
+                    Font: =Font.'Courier New'
+                    Size: 12
+                    FontWeight: =FontWeight.Semibold
+                    Color: =RGBA(50, 49, 48, 1)
+
+                # ---- Title ----
+                - Label:
+                    Name: lblQueueTitle
+                    Text: =ThisItem.Title
+                    X: =If(varBulkSelectMode, 36, 4)
+                    Y: 32
+                    Width: =Parent.Width - 520
+                    Height: 24
+                    Font: =Font.'Segoe UI'
+                    Size: 13
+                    Color: =RGBA(50, 49, 48, 1)
+                    Overflow: =Overflow.Hidden
+
+                # ---- Status Pill ----
+                - Button:
+                    Name: btnQueueStatusPill
+                    Text: =ThisItem.Status
+                    X: =Parent.Width - 500
+                    Y: 18
+                    Width: 120
+                    Height: 26
+                    RadiusTopLeft: 13
+                    RadiusTopRight: 13
+                    RadiusBottomLeft: 13
+                    RadiusBottomRight: 13
+                    Size: 10
+                    FontWeight: =FontWeight.Semibold
+                    DisplayMode: =DisplayMode.Disabled
+                    DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                    BorderStyle: =BorderStyle.None
+                    DisabledColor: |
+                      =If(
+                          ThisItem.Status = "Pending Requester",
+                          RGBA(50, 49, 48, 1),
+                          RGBA(255, 255, 255, 1)
+                      )
+                    DisabledFill: |
+                      =Switch(
+                          ThisItem.Status,
+                          "New",                RGBA(0, 120, 212, 1),
+                          "Assigned",           RGBA(3, 131, 135, 1),
+                          "In Progress",        RGBA(202, 80, 16, 1),
+                          "Pending Requester",  RGBA(255, 185, 0, 1),
+                          "Resolved",           RGBA(16, 124, 16, 1),
+                          "Closed",             RGBA(96, 94, 92, 1),
+                          RGBA(210, 208, 206, 1)
+                      )
+
+                # ---- Priority Pill ----
+                - Button:
+                    Name: btnQueuePriorityPill
+                    Text: =ThisItem.Priority
+                    X: =Parent.Width - 370
+                    Y: 18
+                    Width: 76
+                    Height: 26
+                    RadiusTopLeft: 13
+                    RadiusTopRight: 13
+                    RadiusBottomLeft: 13
+                    RadiusBottomRight: 13
+                    Size: 10
+                    FontWeight: =FontWeight.Semibold
+                    DisplayMode: =DisplayMode.Disabled
+                    DisabledBorderColor: =RGBA(0, 0, 0, 0)
+                    BorderStyle: =BorderStyle.None
+                    DisabledColor: =RGBA(255, 255, 255, 1)
+                    DisabledFill: |
+                      =Switch(
+                          ThisItem.Priority,
+                          "Critical", RGBA(164, 38, 44, 1),
+                          "High",     RGBA(216, 59, 1, 1),
+                          "Medium",   RGBA(255, 185, 0, 1),
+                          "Low",      RGBA(16, 124, 16, 1),
+                          RGBA(210, 208, 206, 1)
+                      )
+
+                # ---- Quick-Assign Dropdown ----
+                - Dropdown:
+                    Name: ddlQuickAssign
+                    Items: =colAgentList.DisplayName
+                    Default: |
+                      =If(
+                          !IsBlank(ThisItem.AssignedTo),
+                          ThisItem.AssignedTo.DisplayName,
+                          ""
+                      )
+                    X: =Parent.Width - 284
+                    Y: 16
+                    Width: 160
+                    Height: 32
+                    Font: =Font.'Segoe UI'
+                    Size: 11
+                    BorderColor: =RGBA(210, 208, 206, 1)
+                    Visible: =!varBulkSelectMode
+                    OnChange: |
+                      =With(
+                          {
+                              selectedAgent: LookUp(
+                                  colAgentList,
+                                  DisplayName = Self.Selected.Value
+                              )
+                          },
+                          Patch(
+                              ServiceDeskTickets,
+                              ThisItem,
+                              {
+                                  AssignedTo: {
+                                      '@odata.type': "#Microsoft.Azure.Connectors.SharePoint.SPListExpandedUser",
+                                      Claims: "i:0#.f|membership|" & Lower(selectedAgent.Email),
+                                      DisplayName: selectedAgent.DisplayName,
+                                      Email: selectedAgent.Email
+                                  },
+                                  Status: If(
+                                      ThisItem.Status = "New",
+                                      "Assigned",
+                                      ThisItem.Status
+                                  )
+                              }
+                          );
+
+                          Notify(
+                              "Assigned to " & selectedAgent.DisplayName,
+                              NotificationType.Success,
+                              1500
+                          )
+                      )
+
+                # ---- SLA Due ----
+                - Label:
+                    Name: lblQueueSLA
+                    Text: |
+                      =If(
+                          IsBlank(ThisItem.SLADueDate),
+                          "--",
+                          With(
+                              { hoursLeft: DateDiff(Now(), ThisItem.SLADueDate, TimeUnit.Hours) },
+                              If(
+                                  hoursLeft < 0,
+                                  "OVERDUE",
+                                  If(
+                                      hoursLeft < 4,
+                                      Text(hoursLeft) & "h",
+                                      Text(ThisItem.SLADueDate, "MMM dd")
+                                  )
+                              )
+                          )
+                      )
+                    X: =Parent.Width - 108
+                    Y: 18
+                    Width: 96
+                    Height: 26
+                    Font: =Font.'Segoe UI'
+                    Size: 11
+                    FontWeight: =FontWeight.Semibold
+                    Align: =Align.Right
+                    VerticalAlign: =VerticalAlign.Middle
+                    Color: |
+                      =With(
+                          { hoursLeft: DateDiff(Now(), ThisItem.SLADueDate, TimeUnit.Hours) },
+                          If(
+                              hoursLeft < 0,   RGBA(164, 38, 44, 1),
+                              hoursLeft < 4,   RGBA(216, 59, 1, 1),
+                              hoursLeft < 24,  RGBA(255, 185, 0, 1),
+                              RGBA(96, 94, 92, 1)
+                          )
+                      )
+
+                # ---- Row click to open detail (when not in bulk mode) ----
+                - Button:
+                    Name: btnQueueRowOpen
+                    Text: ""
+                    X: 0
+                    Y: 0
+                    Width: =Parent.Width
+                    Height: =Parent.Height
+                    Fill: =RGBA(0, 0, 0, 0)
+                    HoverFill: =RGBA(0, 120, 212, 0.04)
+                    BorderStyle: =BorderStyle.None
+                    Visible: =!varBulkSelectMode
+                    OnSelect: |
+                      =Set(varSelectedTicketID, ThisItem.ID);
+                      Navigate(scrTicketDetail, ScreenTransition.Fade);
+
+    # ==========================================================================
+    # UNASSIGNED TICKETS COUNTER
+    # ==========================================================================
+    - Container:
+        Name: conUnassignedBanner
+        Visible: |
+          =varQueueMode = "All Tickets"
+          && CountRows(
+              Filter(ServiceDeskTickets, IsBlank(AssignedTo) && Status = "New")
+          ) > 0
+        X: 20
+        Y: =Parent.Height - 56
+        Width: =Parent.Width - 40
+        Height: 44
+        Fill: =RGBA(255, 185, 0, 0.15)
+        RadiusTopLeft: 6
+        RadiusTopRight: 6
+        RadiusBottomLeft: 6
+        RadiusBottomRight: 6
+        PaddingLeft: 16
+
+        Children:
+          - Label:
+              Name: lblUnassignedCount
+              Text: |
+                =Text(
+                    CountRows(
+                        Filter(ServiceDeskTickets, IsBlank(AssignedTo) && Status = "New")
+                    )
+                ) & " unassigned tickets awaiting triage"
+              Width: =Parent.Width - 32
+              Height: =Parent.Height
+              Font: =Font.'Segoe UI'
+              Size: 13
+              FontWeight: =FontWeight.Semibold
+              Color: =RGBA(202, 80, 16, 1)
+              VerticalAlign: =VerticalAlign.Middle
+
+    # ==========================================================================
+    # LOADING / PROCESSING OVERLAY
+    # ==========================================================================
+    - Container:
+        Name: conQueueLoading
+        Visible: =varLoadingQueue || varBulkProcessing
+        X: 0
+        Y: 0
+        Width: =Parent.Width
+        Height: =Parent.Height
+        Fill: =RGBA(250, 249, 248, 0.85)
+
+        Children:
+          - Label:
+              Name: lblQueueLoadingText
+              Text: |
+                =If(
+                    varBulkProcessing,
+                    "Processing bulk action...",
+                    "Loading queue..."
+                )
+              Width: 300
+              Height: 40
+              X: =(Parent.Width - 300) / 2
+              Y: =(Parent.Height - 40) / 2
+              Font: =Font.'Segoe UI'
+              Size: 14
+              Color: =RGBA(96, 94, 92, 1)
+              Align: =Align.Center
+              VerticalAlign: =VerticalAlign.Middle

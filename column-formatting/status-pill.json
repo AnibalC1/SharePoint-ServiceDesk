@@ -1,0 +1,85 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/sp/v2/column-formatting.schema.json",
+  "elmType": "div",
+  "style": {
+    "display": "flex",
+    "align-items": "center",
+    "justify-content": "center"
+  },
+  "children": [
+    {
+      "elmType": "span",
+      "txtContent": "@currentField",
+      "style": {
+        "display": "inline-block",
+        "padding": "4px 16px",
+        "border-radius": "16px",
+        "font-size": "12px",
+        "font-weight": "600",
+        "letter-spacing": "0.3px",
+        "white-space": "nowrap",
+        "cursor": "default",
+        "transition": "opacity 0.2s ease",
+        "min-width": "80px",
+        "text-align": "center",
+        "color": "=if(@currentField == 'Pending Requester', '#323130', '#ffffff')",
+        "background-color": "=if(@currentField == 'New', '#0078D4', if(@currentField == 'Assigned', '#038387', if(@currentField == 'In Progress', '#CA5010', if(@currentField == 'Pending Requester', '#FFB900', if(@currentField == 'Resolved', '#107C10', if(@currentField == 'Closed', '#605E5C', '#D2D0CE'))))))",
+        "box-shadow": "=if(@currentField == 'New', '0 1px 4px rgba(0,120,212,0.3)', if(@currentField == 'Assigned', '0 1px 4px rgba(3,131,135,0.3)', if(@currentField == 'In Progress', '0 1px 4px rgba(202,80,16,0.3)', if(@currentField == 'Pending Requester', '0 1px 4px rgba(255,185,0,0.3)', if(@currentField == 'Resolved', '0 1px 4px rgba(16,124,16,0.3)', if(@currentField == 'Closed', '0 1px 4px rgba(96,94,92,0.3)', 'none'))))))"
+      },
+      "attributes": {
+        "class": "ms-fontColor-white"
+      },
+      "customCardProps": {
+        "openOnEvent": "hover",
+        "directionalHint": "bottomCenter",
+        "isBeakVisible": true,
+        "formatter": {
+          "elmType": "div",
+          "style": {
+            "padding": "16px",
+            "min-width": "180px"
+          },
+          "children": [
+            {
+              "elmType": "div",
+              "style": {
+                "font-size": "14px",
+                "font-weight": "700",
+                "margin-bottom": "8px",
+                "color": "#323130"
+              },
+              "txtContent": "Status"
+            },
+            {
+              "elmType": "div",
+              "style": {
+                "display": "flex",
+                "align-items": "center",
+                "gap": "8px"
+              },
+              "children": [
+                {
+                  "elmType": "div",
+                  "style": {
+                    "width": "10px",
+                    "height": "10px",
+                    "border-radius": "50%",
+                    "background-color": "=if(@currentField == 'New', '#0078D4', if(@currentField == 'Assigned', '#038387', if(@currentField == 'In Progress', '#CA5010', if(@currentField == 'Pending Requester', '#FFB900', if(@currentField == 'Resolved', '#107C10', if(@currentField == 'Closed', '#605E5C', '#D2D0CE'))))))"
+                  }
+                },
+                {
+                  "elmType": "span",
+                  "txtContent": "@currentField",
+                  "style": {
+                    "font-size": "13px",
+                    "color": "#323130"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
