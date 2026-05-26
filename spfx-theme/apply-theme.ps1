@@ -5,8 +5,6 @@
 .DESCRIPTION
     This script applies the Service Desk branded theme to a SharePoint Online
     site using either PnP PowerShell or the SharePoint Online Management Shell.
-    The theme uses the organization's brand colors for a consistent Service Desk
-    experience across SharePoint pages, lists, and web parts.
 
 .PARAMETER SiteUrl
     The URL of the SharePoint site to apply the theme to.
@@ -17,41 +15,28 @@
 .PARAMETER UsePnP
     Use PnP PowerShell module instead of SPO Management Shell.
 
+.PARAMETER ClientId
+    Entra ID App Registration Client ID. If provided, uses interactive login.
+
 .PARAMETER TenantAdminUrl
     The SharePoint Online tenant admin URL. Required when not using PnP.
-    Example: https://contoso-admin.sharepoint.com
 
 .EXAMPLE
-    # Using PnP PowerShell with web login (simplest — no app registration needed)
     .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" -UsePnP
 
 .EXAMPLE
-    # Using PnP PowerShell with a registered Entra ID app (recommended for automation)
-    .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" -UsePnP -ClientId "your-app-client-id"
-
-.EXAMPLE
-    # Using PnP PowerShell with device code login (no app registration needed)
-    .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" -UsePnP -DeviceLogin
-
-.EXAMPLE
-    # Using SPO Management Shell
-    .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" `
-                       -TenantAdminUrl "https://contoso-admin.sharepoint.com"
+    .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" -UsePnP -ClientId "your-client-id"
 
 .NOTES
     Prerequisites:
-    - For PnP approach:    Install-Module PnP.PowerShell -Scope CurrentUser
-    - For SPO approach:    Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser
-    - SharePoint Admin or Global Admin permissions are required to register tenant themes.
-    - Site Collection Admin permissions are required to apply a theme to a specific site.
-
-    Author:  SharePoint Service Desk Project
-    Version: 1.0.0
+    - PnP approach:  Install-Module PnP.PowerShell -Scope CurrentUser
+    - SPO approach:  Install-Module Microsoft.Online.SharePoint.PowerShell -Scope CurrentUser
+    - SharePoint Admin or Global Admin permissions required.
 #>
 
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true, HelpMessage = "SharePoint site URL to apply the theme to.")]
+    [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
     [string]$SiteUrl,
 
@@ -61,67 +46,58 @@ param(
     [Parameter(Mandatory = $false)]
     [switch]$UsePnP,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Entra ID App Registration Client ID for PnP PowerShell. Required for -Interactive login.")]
+    [Parameter(Mandatory = $false)]
     [string]$ClientId,
 
-    [Parameter(Mandatory = $false, HelpMessage = "Use device code login instead of interactive browser login. Useful when no Entra ID app is registered.")]
-    [switch]$DeviceLogin,
-
-    [Parameter(Mandatory = $false, HelpMessage = "Tenant admin URL (required for SPO Management Shell approach).")]
+    [Parameter(Mandatory = $false)]
     [string]$TenantAdminUrl
 )
 
-# ---------------------------------------------------------------------------
-# Theme palette definition
-# ---------------------------------------------------------------------------
 $themePalette = @{
-    "themePrimary"               = "#0078D4"
-    "themeLighterAlt"            = "#EFF6FC"
-    "themeLighter"               = "#DEECF9"
-    "themeLight"                 = "#C7E0F4"
-    "themeTertiary"              = "#71AFE5"
-    "themeSecondary"             = "#2B88D8"
-    "themeDarkAlt"               = "#106EBE"
-    "themeDark"                  = "#005A9E"
-    "themeDarker"                = "#004578"
-    "neutralLighterAlt"          = "#FAF9F8"
-    "neutralLighter"             = "#F3F2F1"
-    "neutralLight"               = "#EDEBE9"
-    "neutralQuaternaryAlt"       = "#E1DFDD"
-    "neutralQuaternary"          = "#D2D0CE"
-    "neutralTertiaryAlt"         = "#C8C6C4"
-    "neutralTertiary"            = "#A19F9D"
-    "neutralSecondary"           = "#605E5C"
-    "neutralSecondaryAlt"        = "#8A8886"
-    "neutralPrimaryAlt"          = "#3B3A39"
-    "neutralPrimary"             = "#323130"
-    "neutralDark"                = "#201F1E"
-    "black"                      = "#000000"
-    "white"                      = "#FFFFFF"
-    "primaryBackground"          = "#FFFFFF"
-    "primaryText"                = "#323130"
-    "bodyBackground"             = "#FFFFFF"
-    "bodyText"                   = "#323130"
-    "disabledBackground"         = "#F3F2F1"
-    "disabledText"               = "#A19F9D"
-    "error"                      = "#A4262C"
-    "accent"                     = "#038387"
-    "headerBackground"           = "#0078D4"
-    "headerBackgroundSearch"     = "#FFFFFF"
-    "headerBrandText"            = "#FFFFFF"
-    "headerTextIcons"            = "#FFFFFF"
-    "headerSearchScope"          = "#FFFFFF"
-    "suiteBarBackground"         = "#004578"
-    "suiteBarText"               = "#FFFFFF"
-    "suiteBarDisabledText"       = "#71AFE5"
-    "searchBoxBackground"        = "#DEECF9"
-    "topBarBackground"           = "#0078D4"
-    "topBarText"                 = "#FFFFFF"
+    "themePrimary"           = "#0078D4"
+    "themeLighterAlt"        = "#EFF6FC"
+    "themeLighter"           = "#DEECF9"
+    "themeLight"             = "#C7E0F4"
+    "themeTertiary"          = "#71AFE5"
+    "themeSecondary"         = "#2B88D8"
+    "themeDarkAlt"           = "#106EBE"
+    "themeDark"              = "#005A9E"
+    "themeDarker"            = "#004578"
+    "neutralLighterAlt"      = "#FAF9F8"
+    "neutralLighter"         = "#F3F2F1"
+    "neutralLight"           = "#EDEBE9"
+    "neutralQuaternaryAlt"   = "#E1DFDD"
+    "neutralQuaternary"      = "#D2D0CE"
+    "neutralTertiaryAlt"     = "#C8C6C4"
+    "neutralTertiary"        = "#A19F9D"
+    "neutralSecondary"       = "#605E5C"
+    "neutralSecondaryAlt"    = "#8A8886"
+    "neutralPrimaryAlt"      = "#3B3A39"
+    "neutralPrimary"         = "#323130"
+    "neutralDark"            = "#201F1E"
+    "black"                  = "#000000"
+    "white"                  = "#FFFFFF"
+    "primaryBackground"      = "#FFFFFF"
+    "primaryText"            = "#323130"
+    "bodyBackground"         = "#FFFFFF"
+    "bodyText"               = "#323130"
+    "disabledBackground"     = "#F3F2F1"
+    "disabledText"           = "#A19F9D"
+    "error"                  = "#A4262C"
+    "accent"                 = "#038387"
+    "headerBackground"       = "#0078D4"
+    "headerBackgroundSearch" = "#FFFFFF"
+    "headerBrandText"        = "#FFFFFF"
+    "headerTextIcons"        = "#FFFFFF"
+    "headerSearchScope"      = "#FFFFFF"
+    "suiteBarBackground"     = "#004578"
+    "suiteBarText"           = "#FFFFFF"
+    "suiteBarDisabledText"   = "#71AFE5"
+    "searchBoxBackground"    = "#DEECF9"
+    "topBarBackground"       = "#0078D4"
+    "topBarText"             = "#FFFFFF"
 }
 
-# ---------------------------------------------------------------------------
-# Helper: Write-Step
-# ---------------------------------------------------------------------------
 function Write-Step {
     param([string]$Message)
     Write-Host "[*] $Message" -ForegroundColor Cyan
@@ -137,14 +113,11 @@ function Write-Failure {
     Write-Host "[-] $Message" -ForegroundColor Red
 }
 
-# =========================================================================
-# APPROACH 1: PnP PowerShell
-# =========================================================================
 function Apply-ThemeWithPnP {
     param(
-        [string]$SiteUrl,
-        [string]$ThemeName,
-        [hashtable]$Palette
+        [string]$url,
+        [string]$name,
+        [hashtable]$palette
     )
 
     Write-Step "Checking for PnP.PowerShell module..."
@@ -155,55 +128,47 @@ function Apply-ThemeWithPnP {
     }
 
     try {
-        # Connect to SharePoint Online
-        Write-Step "Connecting to SharePoint Online at $SiteUrl..."
+        Write-Step "Connecting to SharePoint Online at $url..."
         if ($ClientId) {
             Write-Step "Using interactive login with Client ID: $ClientId"
-            Connect-PnPOnline -Url $SiteUrl -Interactive -ClientId $ClientId
+            Connect-PnPOnline -Url $url -Interactive -ClientId $ClientId
         }
         else {
-            Write-Step "Using device code login — follow the instructions below..."
-            Connect-PnPOnline -Url $SiteUrl -DeviceLogin
+            Write-Step "Using device code login - follow the instructions below..."
+            Connect-PnPOnline -Url $url -DeviceLogin
         }
 
-        # Check if theme already exists and remove it for a clean apply
-        Write-Step "Checking for existing theme '$ThemeName'..."
-        $existingTheme = Get-PnPTenantTheme -Name $ThemeName -ErrorAction SilentlyContinue
+        Write-Step "Checking for existing theme..."
+        $existingTheme = Get-PnPTenantTheme -Name $name -ErrorAction SilentlyContinue
         if ($existingTheme) {
-            Write-Step "Removing existing theme '$ThemeName' to apply updated version..."
-            Remove-PnPTenantTheme -Name $ThemeName
+            Write-Step "Removing existing theme to apply updated version..."
+            Remove-PnPTenantTheme -Name $name
         }
 
-        # Register the theme at the tenant level
-        Write-Step "Registering theme '$ThemeName' at tenant level..."
-        Add-PnPTenantTheme -Identity $ThemeName -Palette $Palette -IsInverted $false -Overwrite
+        Write-Step "Registering theme at tenant level..."
+        Add-PnPTenantTheme -Identity $name -Palette $palette -IsInverted $false -Overwrite
 
-        # Apply the theme to the specific site
-        Write-Step "Applying theme '$ThemeName' to site $SiteUrl..."
-        Set-PnPWebTheme -Theme $ThemeName
+        Write-Step "Applying theme to site..."
+        Set-PnPWebTheme -Theme $name
 
-        Write-Success "Theme '$ThemeName' has been applied successfully to $SiteUrl"
+        Write-Success "Theme has been applied successfully to $url"
 
-        # Disconnect
         Disconnect-PnPOnline
         return $true
     }
     catch {
-        Write-Failure "Error applying theme with PnP: $($_.Exception.Message)"
+        Write-Failure ("Error applying theme with PnP: " + $_.Exception.Message)
         Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
         return $false
     }
 }
 
-# =========================================================================
-# APPROACH 2: SharePoint Online Management Shell
-# =========================================================================
 function Apply-ThemeWithSPO {
     param(
-        [string]$SiteUrl,
-        [string]$TenantAdminUrl,
-        [string]$ThemeName,
-        [hashtable]$Palette
+        [string]$url,
+        [string]$adminUrl,
+        [string]$name,
+        [hashtable]$palette
     )
 
     Write-Step "Checking for Microsoft.Online.SharePoint.PowerShell module..."
@@ -214,42 +179,35 @@ function Apply-ThemeWithSPO {
     }
 
     try {
-        # Connect to SharePoint Online Admin
-        Write-Step "Connecting to SharePoint Online Admin at $TenantAdminUrl..."
-        Connect-SPOService -Url $TenantAdminUrl
+        Write-Step "Connecting to SharePoint Online Admin at $adminUrl..."
+        Connect-SPOService -Url $adminUrl
 
-        # Check if theme already exists
-        Write-Step "Checking for existing theme '$ThemeName'..."
-        $existingThemes = Get-SPOTheme | Where-Object { $_.Name -eq $ThemeName }
+        Write-Step "Checking for existing theme..."
+        $existingThemes = Get-SPOTheme | Where-Object { $_.Name -eq $name }
         if ($existingThemes) {
-            Write-Step "Removing existing theme '$ThemeName' to apply updated version..."
-            Remove-SPOTheme -Name $ThemeName
+            Write-Step "Removing existing theme to apply updated version..."
+            Remove-SPOTheme -Name $name
         }
 
-        # Register the theme
-        Write-Step "Registering theme '$ThemeName' at tenant level..."
-        Add-SPOTheme -Identity $ThemeName -Palette $Palette -IsInverted $false -Overwrite
+        Write-Step "Registering theme at tenant level..."
+        Add-SPOTheme -Identity $name -Palette $palette -IsInverted $false -Overwrite
 
-        # Apply the theme to the site
-        Write-Step "Applying theme to site $SiteUrl..."
-        Set-SPOWebTheme -Theme $ThemeName -WebUrl $SiteUrl
+        Write-Step "Applying theme to site $url..."
+        Set-SPOWebTheme -Theme $name -WebUrl $url
 
-        Write-Success "Theme '$ThemeName' has been applied successfully to $SiteUrl"
+        Write-Success "Theme has been applied successfully to $url"
 
-        # Disconnect
         Disconnect-SPOService
         return $true
     }
     catch {
-        Write-Failure "Error applying theme with SPO Management Shell: $($_.Exception.Message)"
+        Write-Failure ("Error applying theme with SPO: " + $_.Exception.Message)
         Write-Host $_.ScriptStackTrace -ForegroundColor DarkGray
         return $false
     }
 }
 
-# =========================================================================
 # Main execution
-# =========================================================================
 Write-Host ""
 Write-Host "=========================================" -ForegroundColor White
 Write-Host "  Service Desk Theme Deployment Script"    -ForegroundColor White
@@ -257,20 +215,22 @@ Write-Host "=========================================" -ForegroundColor White
 Write-Host ""
 Write-Host "  Site URL:   $SiteUrl" -ForegroundColor Gray
 Write-Host "  Theme Name: $ThemeName" -ForegroundColor Gray
-Write-Host "  Method:     $(if ($UsePnP) { 'PnP PowerShell' } else { 'SPO Management Shell' })" -ForegroundColor Gray
+
+$methodLabel = "SPO Management Shell"
+if ($UsePnP) { $methodLabel = "PnP PowerShell" }
+Write-Host "  Method:     $methodLabel" -ForegroundColor Gray
 Write-Host ""
 
 if ($UsePnP) {
-    $result = Apply-ThemeWithPnP -SiteUrl $SiteUrl -ThemeName $ThemeName -Palette $themePalette
+    $result = Apply-ThemeWithPnP -url $SiteUrl -name $ThemeName -palette $themePalette
 }
 else {
-    # Validate TenantAdminUrl for SPO approach
     if ([string]::IsNullOrWhiteSpace($TenantAdminUrl)) {
         Write-Failure "TenantAdminUrl is required when using SPO Management Shell."
         Write-Host "  Provide it with -TenantAdminUrl or use -UsePnP for PnP PowerShell." -ForegroundColor Yellow
         exit 1
     }
-    $result = Apply-ThemeWithSPO -SiteUrl $SiteUrl -TenantAdminUrl $TenantAdminUrl -ThemeName $ThemeName -Palette $themePalette
+    $result = Apply-ThemeWithSPO -url $SiteUrl -adminUrl $TenantAdminUrl -name $ThemeName -palette $themePalette
 }
 
 if (-not $result) {
@@ -286,10 +246,6 @@ Write-Host "-----------------------------------------" -ForegroundColor White
 Write-Host ""
 Write-Host "  1. Navigate to $SiteUrl and verify the theme is applied." -ForegroundColor Gray
 Write-Host "  2. Clear browser cache if you do not see changes immediately." -ForegroundColor Gray
-Write-Host "  3. The theme is registered tenant-wide. Other site admins can" -ForegroundColor Gray
-Write-Host "     select '$ThemeName' from the Change the Look panel." -ForegroundColor Gray
-Write-Host "  4. To remove the theme later, run:" -ForegroundColor Gray
-Write-Host "       Remove-PnPTenantTheme -Name '$ThemeName'" -ForegroundColor DarkGray
-Write-Host "     or" -ForegroundColor Gray
-Write-Host "       Remove-SPOTheme -Name '$ThemeName'" -ForegroundColor DarkGray
+Write-Host "  3. The theme is registered tenant-wide." -ForegroundColor Gray
+Write-Host "  4. To remove later: Remove-PnPTenantTheme -Name $ThemeName" -ForegroundColor DarkGray
 Write-Host ""

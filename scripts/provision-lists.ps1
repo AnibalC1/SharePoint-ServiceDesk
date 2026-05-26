@@ -99,7 +99,7 @@ elseif ($ClientId) {
     Connect-PnPOnline -Url $SiteUrl -Interactive -ClientId $ClientId
 }
 else {
-    Write-Host "Using device code login — follow the instructions below..." -ForegroundColor Cyan
+    Write-Host "Using device code login - follow the instructions below..." -ForegroundColor Cyan
     Connect-PnPOnline -Url $SiteUrl -DeviceLogin
 }
 Write-Host "Connected successfully." -ForegroundColor Green
@@ -137,7 +137,7 @@ function Add-FieldToList {
     $fieldType    = $FieldDef.Type
     $required     = if ($FieldDef.PSObject.Properties.Name -contains "Required") { $FieldDef.Required } else { $false }
 
-    # Skip the built-in Title field — we just rename it if needed
+    # Skip the built-in Title field - we just rename it if needed
     if ($internalName -eq "Title") {
         # Rename the Title field display name if it differs
         if ($displayName -ne "Title") {
@@ -303,7 +303,7 @@ function Add-ViewToList {
 }
 
 # ===================================================================
-# 1. Provision Categories list (must be first — Tickets depends on it)
+# 1. Provision Categories list (must be first - Tickets depends on it)
 # ===================================================================
 Write-Host "`n=======================================" -ForegroundColor Cyan
 Write-Host "  Provisioning: $($CategoriesSchema.listName)" -ForegroundColor Cyan
@@ -416,7 +416,7 @@ Invoke-PnPQuery
 
 Write-Host "  Adding fields..." -ForegroundColor White
 foreach ($fieldDef in $TicketsSchema.fields) {
-    # Skip the Lookup field — we add it manually below
+    # Skip the Lookup field - we add it manually below
     if ($fieldDef.Type -eq "Lookup") {
         continue
     }
