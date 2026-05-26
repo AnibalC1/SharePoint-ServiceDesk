@@ -22,18 +22,21 @@
     Example: https://contoso-admin.sharepoint.com
 
 .EXAMPLE
-    # Using PnP PowerShell (recommended)
+    # Using PnP PowerShell with web login (simplest — no app registration needed)
     .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" -UsePnP
+
+.EXAMPLE
+    # Using PnP PowerShell with a registered Entra ID app (recommended for automation)
+    .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" -UsePnP -ClientId "your-app-client-id"
+
+.EXAMPLE
+    # Using PnP PowerShell with device code login (no app registration needed)
+    .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" -UsePnP -DeviceLogin
 
 .EXAMPLE
     # Using SPO Management Shell
     .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" `
                        -TenantAdminUrl "https://contoso-admin.sharepoint.com"
-
-.EXAMPLE
-    # Custom theme name
-    .\apply-theme.ps1 -SiteUrl "https://contoso.sharepoint.com/sites/ServiceDesk" `
-                       -ThemeName "IT Service Desk" -UsePnP
 
 .NOTES
     Prerequisites:
@@ -57,6 +60,12 @@ param(
 
     [Parameter(Mandatory = $false)]
     [switch]$UsePnP,
+
+    [Parameter(Mandatory = $false, HelpMessage = "Entra ID App Registration Client ID for PnP PowerShell. Required for -Interactive login.")]
+    [string]$ClientId,
+
+    [Parameter(Mandatory = $false, HelpMessage = "Use device code login instead of interactive browser login. Useful when no Entra ID app is registered.")]
+    [switch]$DeviceLogin,
 
     [Parameter(Mandatory = $false, HelpMessage = "Tenant admin URL (required for SPO Management Shell approach).")]
     [string]$TenantAdminUrl
@@ -146,9 +155,20 @@ function Apply-ThemeWithPnP {
     }
 
     try {
-        # Connect to SharePoint Online (interactive login)
+        # Connect to SharePoint Online
         Write-Step "Connecting to SharePoint Online at $SiteUrl..."
-        Connect-PnPOnline -Url $SiteUrl -Interactive
+        if ($ClientId) {
+            Write-Step "Using interactive login with Client ID: $ClientId"
+            Connect-PnPOnline -Url $SiteUrl -Interactive -ClientId $ClientId
+        }
+        elseif ($DeviceLogin) {
+            Write-Step "Using device code login (check your browser)..."
+            Connect-PnPOnline -Url $SiteUrl -DeviceLogin
+        }
+        else {
+            Write-Step "Using web login (browser-based)..."
+            Connect-PnPOnline -Url $SiteUrl -WebLogin
+        }
 
         # Check if theme already exists and remove it for a clean apply
         Write-Step "Checking for existing theme '$ThemeName'..."

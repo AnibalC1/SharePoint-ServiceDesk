@@ -40,6 +40,12 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$SiteUrl,
 
+    [Parameter(Mandatory = $false, HelpMessage = "Entra ID App Registration Client ID for PnP PowerShell interactive login.")]
+    [string]$ClientId,
+
+    [Parameter(Mandatory = $false, HelpMessage = "Use device code login instead of interactive browser login.")]
+    [switch]$DeviceLogin,
+
     [Parameter(Mandatory = $false, HelpMessage = "Optional path to saved PnP credential XML file")]
     [string]$CredentialPath
 )
@@ -87,8 +93,18 @@ Write-Host "`nConnecting to $SiteUrl ..." -ForegroundColor Cyan
 if ($CredentialPath -and (Test-Path $CredentialPath)) {
     $cred = Import-Clixml -Path $CredentialPath
     Connect-PnPOnline -Url $SiteUrl -Credentials $cred
-} else {
-    Connect-PnPOnline -Url $SiteUrl -Interactive
+}
+elseif ($ClientId) {
+    Write-Host "Using interactive login with Client ID: $ClientId" -ForegroundColor Cyan
+    Connect-PnPOnline -Url $SiteUrl -Interactive -ClientId $ClientId
+}
+elseif ($DeviceLogin) {
+    Write-Host "Using device code login..." -ForegroundColor Cyan
+    Connect-PnPOnline -Url $SiteUrl -DeviceLogin
+}
+else {
+    Write-Host "Using web login (browser-based)..." -ForegroundColor Cyan
+    Connect-PnPOnline -Url $SiteUrl -WebLogin
 }
 Write-Host "Connected successfully." -ForegroundColor Green
 
