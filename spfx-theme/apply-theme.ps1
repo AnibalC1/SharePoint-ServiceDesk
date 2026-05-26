@@ -130,12 +130,10 @@ function Apply-ThemeWithPnP {
     try {
         Write-Step "Connecting to SharePoint Online at $url..."
         if ($ClientId) {
-            Write-Step "Using interactive login with Client ID: $ClientId"
             Connect-PnPOnline -Url $url -Interactive -ClientId $ClientId
         }
         else {
-            Write-Step "Using device code login - follow the instructions below..."
-            Connect-PnPOnline -Url $url -DeviceLogin
+            Connect-PnPOnline -Url $url -Interactive
         }
 
         Write-Step "Checking for existing theme..."
