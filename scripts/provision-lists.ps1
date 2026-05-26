@@ -98,13 +98,9 @@ elseif ($ClientId) {
     Write-Host "Using interactive login with Client ID: $ClientId" -ForegroundColor Cyan
     Connect-PnPOnline -Url $SiteUrl -Interactive -ClientId $ClientId
 }
-elseif ($DeviceLogin) {
-    Write-Host "Using device code login..." -ForegroundColor Cyan
-    Connect-PnPOnline -Url $SiteUrl -DeviceLogin
-}
 else {
-    Write-Host "Using web login (browser-based)..." -ForegroundColor Cyan
-    Connect-PnPOnline -Url $SiteUrl -WebLogin
+    Write-Host "Using device code login — follow the instructions below..." -ForegroundColor Cyan
+    Connect-PnPOnline -Url $SiteUrl -DeviceLogin
 }
 Write-Host "Connected successfully." -ForegroundColor Green
 

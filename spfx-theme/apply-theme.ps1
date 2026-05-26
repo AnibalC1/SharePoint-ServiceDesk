@@ -161,13 +161,9 @@ function Apply-ThemeWithPnP {
             Write-Step "Using interactive login with Client ID: $ClientId"
             Connect-PnPOnline -Url $SiteUrl -Interactive -ClientId $ClientId
         }
-        elseif ($DeviceLogin) {
-            Write-Step "Using device code login (check your browser)..."
-            Connect-PnPOnline -Url $SiteUrl -DeviceLogin
-        }
         else {
-            Write-Step "Using web login (browser-based)..."
-            Connect-PnPOnline -Url $SiteUrl -WebLogin
+            Write-Step "Using device code login — follow the instructions below..."
+            Connect-PnPOnline -Url $SiteUrl -DeviceLogin
         }
 
         # Check if theme already exists and remove it for a clean apply
